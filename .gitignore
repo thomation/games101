@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+#build folder
+Homework1/Assignment1/build/

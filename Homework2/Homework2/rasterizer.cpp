@@ -43,7 +43,13 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
 static bool insideTriangle(int x, int y, const Vector3f* _v)
 {
 	// TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
-	return true;
+	Vector3f a{ _v[0].x() - x, _v[0].y() - y, 0 };
+	Vector3f b{ _v[1].x() - x, _v[1].y() - y, 0 };
+	Vector3f c{ _v[2].x() - x, _v[2].y() - y, 0 };
+	auto cross0 = a.cross(b);
+	auto cross1 = b.cross(c);
+	auto cross2 = c.cross(a);
+	return cross0.z() > 0 && cross1.z() > 0 && cross2.z() > 0 || cross0.z() < 0 && cross1.z() < 0 && cross2.z() < 0;
 }
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector3f* v)
@@ -122,23 +128,27 @@ static void find_bounding_box(const Triangle& t, Vector2f& min, Vector2f& max)
 }
 //Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle& t) {
-	Eigen::Vector3f point_color = { 255, 0, 0 };
 	auto v = t.toVector4();
 	std::cout << "rasterizer" << std::endl;
-	for (auto e : v)
-		std::cout << e << std::endl;
+	//for (auto e : v)
+		//std::cout << e << std::endl;
+	// Find out the bounding box of current triangle.
 	Vector2f box_min, box_max;
 	find_bounding_box(t, box_min, box_max);
 
-	std::cout << box_min << std::endl;
-	std::cout << box_max << std::endl;
+	//std::cout << box_min << std::endl;
+	//std::cout << box_max << std::endl;
 
-	for (int y = (int)box_min[1]; y < (int) (box_max[1] + 0.5); y++)
+	// Only one color per triangle.
+	Eigen::Vector3f point_color = t.getColor();
+	// iterate through the pixel and find if the current pixel is inside the triangle
+	for (int y = (int)box_min[1]; y < (int)(box_max[1] + 0.5); y++)
 	{
 		for (int x = (int)box_min[0]; x < (int)(box_max[0] + 0.5); x++)
 		{
 			if (insideTriangle(x, y, t.v))
 			{
+				// set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
 				Vector3f point = { (float)x , (float)y , 0 };
 				set_pixel(point, point_color);
 			}
@@ -148,8 +158,6 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
 	draw_line(t.v[2], t.v[1]);
 	draw_line(t.v[1], t.v[0]);
 
-	// TODO : Find out the bounding box of current triangle.
-	// iterate through the pixel and find if the current pixel is inside the triangle
 
 	// If so, use the following code to get the interpolated z value.
 	//auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
@@ -157,7 +165,6 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
 	//float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
 	//z_interpolated *= w_reciprocal;
 
-	// TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
 }
 // Bresenham's line drawing algorithm
 // Code taken from a stack overflow answer: https://stackoverflow.com/a/16405254

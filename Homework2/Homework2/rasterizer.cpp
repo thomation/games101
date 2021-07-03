@@ -108,7 +108,7 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
 		rasterize_triangle(t);
 	}
 }
-static void find_bounding_box(const Triangle& t, Vector2f& min, Vector2f& max)
+static void compute_bounding_box(const Triangle& t, Vector2f& min, Vector2f& max)
 {
 	min[0] = max[0] = t.v[0].x();
 	min[1] = max[1] = t.v[0].y();
@@ -134,7 +134,7 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
 		//std::cout << e << std::endl;
 	// Find out the bounding box of current triangle.
 	Vector2f box_min, box_max;
-	find_bounding_box(t, box_min, box_max);
+	compute_bounding_box(t, box_min, box_max);
 
 	//std::cout << box_min << std::endl;
 	//std::cout << box_max << std::endl;
@@ -148,22 +148,27 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
 		{
 			if (insideTriangle(x, y, t.v))
 			{
-				// set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
-				Vector3f point = { (float)x , (float)y , 0 };
-				set_pixel(point, point_color);
+				//If so, use the following code to get the interpolated z value.
+				auto [alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+				float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+				float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+				z_interpolated *= w_reciprocal;
+				int buff_index = y * width + x;
+				if (z_interpolated < depth_buf[buff_index])
+				{
+					depth_buf[buff_index] = z_interpolated;
+					// set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+					Vector3f point = { (float)x , (float)y , 0 };
+					set_pixel(point, point_color);
+				}
 			}
 		}
 	}
-	draw_line(t.v[2], t.v[0]);
-	draw_line(t.v[2], t.v[1]);
-	draw_line(t.v[1], t.v[0]);
+	//draw_line(t.v[2], t.v[0]);
+	//draw_line(t.v[2], t.v[1]);
+	//draw_line(t.v[1], t.v[0]);
 
 
-	// If so, use the following code to get the interpolated z value.
-	//auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-	//float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-	//float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-	//z_interpolated *= w_reciprocal;
 
 }
 // Bresenham's line drawing algorithm

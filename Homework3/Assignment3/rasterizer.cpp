@@ -289,9 +289,9 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
 	//std::cout << box_max << std::endl;
 
 	// iterate through the pixel and find if the current pixel is inside the triangle
-	for (int y = (int)box_min[1]; y < (int)(box_max[1] + 0.5); y++)
+	for (int y = (int)box_min[1]; y < (int)(box_max[1] + 1.0); y++)
 	{
-		for (int x = (int)box_min[0]; x < (int)(box_max[0] + 0.5); x++)
+		for (int x = (int)box_min[0]; x < (int)(box_max[0] + 1.0); x++)
 		{
 			if (insideTriangle(x, y, t.v))
 			{

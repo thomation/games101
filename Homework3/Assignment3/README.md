@@ -3,4 +3,5 @@
 * Blinn-phong 反射模型
 * Texture mapping
 * Bump mapping
+* Displacement mapping
 * 在visual studio下编译和运行，考虑到跨平台问题，自己实现了my_max, my_min, saturate方法

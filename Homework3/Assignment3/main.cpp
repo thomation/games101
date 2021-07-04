@@ -265,7 +265,7 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 	auto dU = kh * kn * (payload.texture->getColor(saturate(u + 1.0 / w), saturate(v)).norm() - payload.texture->getColor(saturate(u), saturate(v)).norm());
 	auto dV = kh * kn * (payload.texture->getColor(saturate(u), saturate(v + 1.0 / h)).norm() - payload.texture->getColor(saturate(u), saturate(v)).norm());
 	Eigen::Vector3f ln = { -dU, -dV, 1 };
-	point += kn * normal.cwiseProduct(payload.texture->getColor(saturate(u), saturate(v)));
+	point += kn * normal * payload.texture->getColor(saturate(u), saturate(v)).norm();
 	normal = (TBN * ln).normalized();
 	Eigen::Vector3f result_color = { 0, 0, 0 };
 

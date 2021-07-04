@@ -112,6 +112,24 @@ static float saturate(float v)
 	if (v < 0) return 0;
 	return v;
 }
+static void blinn_phong(const light & light, const Eigen::Vector3f &amb_light_intensity, const Eigen::Vector3f & ka, const Eigen::Vector3f &kd, const Eigen::Vector3f &ks, float gloss,
+	const Eigen::Vector3f & point, const Eigen::Vector3f & normal, const Eigen::Vector3f &view_dir,
+	Eigen::Vector3f &result_color)
+{
+	Eigen::Vector3f ambient = amb_light_intensity.array() * ka.array();
+
+	auto light_dir = light.position - point;
+	Eigen::Vector3f light_intensity = light.intensity / light_dir.squaredNorm();
+
+	auto diffuse_value = my_max(light_dir.normalized().dot(normal), 0);
+	Eigen::Vector3f diffuse = kd.array() * light_intensity.array() * diffuse_value;
+
+	auto half_dir = (view_dir + normal).normalized();
+	auto specular_value = pow(my_max(normal.dot(half_dir), 0), gloss);
+	Eigen::Vector3f specular = ks.array() * light_intensity.array() * specular_value;
+
+	result_color += ambient + diffuse + specular;
+}
 Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 {
 	Eigen::Vector3f return_color = { 0, 0, 0 };
@@ -149,21 +167,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload& payload)
 	{
 		// For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
 		// components are. Then, accumulate that result on the *result_color* object.
-
-		Eigen::Vector3f ambient = amb_light_intensity.array() * ka.array();
-
-		auto light_dir = light.position - point;
-		Eigen::Vector3f light_intensity = light.intensity / light_dir.squaredNorm();
-
-		auto diffuse_value = my_max(light_dir.normalized().dot(normal), 0);
-		Eigen::Vector3f diffuse = kd.array() * light_intensity.array() * diffuse_value;
-
-		auto half_dir = (view_dir + normal).normalized();
-		auto specular_value = pow(my_max(normal.dot(half_dir), 0), p);
-		Eigen::Vector3f specular = ks.array() * light_intensity.array() * specular_value;
-
-		result_color += ambient + diffuse + specular;
-
+		blinn_phong(light, amb_light_intensity, ka, kd, ks, p, point, normal, view_dir, result_color);
 	}
 
 	return result_color * 255.f;
@@ -195,21 +199,8 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload& payload)
 	{
 		// For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
 		// components are. Then, accumulate that result on the *result_color* object.
-		Eigen::Vector3f ambient = amb_light_intensity.array() * ka.array();
-
-		auto light_dir = light.position - point;
-		Eigen::Vector3f light_intensity = light.intensity / light_dir.squaredNorm();
-
-		auto diffuse_value = my_max(light_dir.normalized().dot(normal), 0);
-		Eigen::Vector3f diffuse = kd.array() * light_intensity.array() * diffuse_value;
-
-		auto half_dir = (view_dir + normal).normalized();
-		auto specular_value = pow(my_max(normal.dot(half_dir), 0), p);
-		Eigen::Vector3f specular = ks.array() * light_intensity.array() * specular_value;
-
-		result_color += ambient + diffuse + specular;
+		blinn_phong(light, amb_light_intensity, ka, kd, ks, p, point, normal, view_dir, result_color);
 	}
-
 	return result_color * 255.f;
 }
 
@@ -274,7 +265,7 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 	auto dU = kh * kn * (payload.texture->getColor(saturate(u + 1.0 / w), saturate(v)).norm() - payload.texture->getColor(saturate(u), saturate(v)).norm());
 	auto dV = kh * kn * (payload.texture->getColor(saturate(u), saturate(v + 1.0 / h)).norm() - payload.texture->getColor(saturate(u), saturate(v)).norm());
 	Eigen::Vector3f ln = { -dU, -dV, 1 };
-	point = point.array() + kn * normal.array() * payload.texture->getColor(saturate(u), saturate(v)).array();
+	point += kn * normal.cwiseProduct(payload.texture->getColor(saturate(u), saturate(v)));
 	normal = (TBN * ln).normalized();
 	Eigen::Vector3f result_color = { 0, 0, 0 };
 
@@ -283,20 +274,7 @@ Eigen::Vector3f displacement_fragment_shader(const fragment_shader_payload& payl
 	{
 		// For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular* 
 		// components are. Then, accumulate that result on the *result_color* object.
-		Eigen::Vector3f ambient = amb_light_intensity.array() * ka.array();
-
-		auto light_dir = light.position - point;
-		Eigen::Vector3f light_intensity = light.intensity / light_dir.squaredNorm();
-
-		auto diffuse_value = my_max(light_dir.normalized().dot(normal), 0);
-		Eigen::Vector3f diffuse = kd.array() * light_intensity.array() * diffuse_value;
-
-		auto half_dir = (view_dir + normal).normalized();
-		auto specular_value = pow(my_max(normal.dot(half_dir), 0), p);
-		Eigen::Vector3f specular = ks.array() * light_intensity.array() * specular_value;
-
-		result_color += ambient + diffuse + specular;
-
+		blinn_phong(light, amb_light_intensity, ka, kd, ks, p, point, normal, view_dir, result_color);
 	}
 
 	return result_color * 255.f;

@@ -4,7 +4,7 @@
 
 std::vector<cv::Point2f> control_points;
 
-const int Max_Control_Point = 4;
+const int Max_Control_Point = 8;
 
 void mouse_handler(int event, int x, int y, int flags, void* userdata)
 {
@@ -82,7 +82,7 @@ int main()
 
 		if (control_points.size() == Max_Control_Point)
 		{
-			naive_bezier(control_points, window);
+			//naive_bezier(control_points, window);
 			bezier(control_points, window);
 
 			cv::imshow("Bezier Curve", window);

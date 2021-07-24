@@ -130,6 +130,7 @@ Vector3f castRay(
     }
 
     Vector3f hitColor = scene.backgroundColor;
+    //return dir;
     if (auto payload = trace(orig, dir, scene.get_objects()); payload)
     {
         Vector3f hitPoint = orig + dir * payload->tNear;
@@ -224,8 +225,8 @@ void Renderer::Render(const Scene& scene)
         for (int i = 0; i < scene.width; ++i)
         {
             // generate primary ray direction
-            float x = i / scene.width * scaleW;
-            float y = j / scene.height * scaleH;
+            float x = (2 * (i + 0.5) / scene.width - 1) * scaleW;
+            float y = (1 - 2 * (j + 0.5) / scene.height) * scaleH;
             // TODO: Find the x and y positions of the current pixel to get the direction
             // vector that passes through it.
             // Also, don't forget to multiply both of them with the variable *scale*, and

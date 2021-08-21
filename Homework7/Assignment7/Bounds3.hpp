@@ -96,6 +96,9 @@ inline bool Bounds3::IntersectP(const Ray& ray, const Vector3f& invDir,
     // invDir: ray direction(x,y,z), invDir=(1.0/x,1.0/y,1.0/z), use this because Multiply is faster that Division
     // dirIsNeg: ray direction(x,y,z), dirIsNeg=[int(x>0),int(y>0),int(z>0)], use this to simplify your logic
     // TODO test if ray bound intersects
+	if(ray.origin.x >= pMin.x && ray.origin.x <= pMax.x && ray.origin.y >= pMin.y &&
+                ray.origin.y <= pMax.y && ray.origin.z >= pMin.z && ray.origin.z <= pMax.z);
+        return true;
     Vector3f ptOnPlane;
     float t;
     if (std::abs(ray.direction.x) > 0.00001f)
@@ -107,7 +110,7 @@ inline bool Bounds3::IntersectP(const Ray& ray, const Vector3f& invDir,
         if (t > 0)
         {
             ptOnPlane = ray.origin + t * ray.direction;
-            if (ptOnPlane.y > pMin.y && ptOnPlane.y < pMax.y && ptOnPlane.z > pMin.z && ptOnPlane.z < pMax.z)
+            if (ptOnPlane.y >= pMin.y && ptOnPlane.y <= pMax.y && ptOnPlane.z >= pMin.z && ptOnPlane.z <= pMax.z)
                 return true;
         }
     }
@@ -120,7 +123,7 @@ inline bool Bounds3::IntersectP(const Ray& ray, const Vector3f& invDir,
         if (t > 0)
         {
             ptOnPlane = ray.origin + t * ray.direction;
-            if (ptOnPlane.x > pMin.x && ptOnPlane.x < pMax.x && ptOnPlane.z > pMin.z && ptOnPlane.z < pMax.z)
+            if (ptOnPlane.x >= pMin.x && ptOnPlane.x <= pMax.x && ptOnPlane.z >= pMin.z && ptOnPlane.z <= pMax.z)
                 return true;
         }
     }
@@ -133,7 +136,7 @@ inline bool Bounds3::IntersectP(const Ray& ray, const Vector3f& invDir,
         if (t > 0)
         {
             ptOnPlane = ray.origin + t * ray.direction;
-            if (ptOnPlane.y > pMin.y && ptOnPlane.y < pMax.y && ptOnPlane.x > pMin.x && ptOnPlane.x < pMax.x)
+            if (ptOnPlane.y >= pMin.y && ptOnPlane.y <= pMax.y && ptOnPlane.x >= pMin.x && ptOnPlane.x <= pMax.x)
                 return true;
         }
     }

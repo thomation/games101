@@ -87,23 +87,42 @@ Vector3f Scene::castRay(const Ray& ray, int depth) const
 			Intersection lightSample;
 			float lightPdf;
 			sampleLight(lightSample, lightPdf);
-			Vector3f lightPos = lightSample.coords;
-			Vector3f ws = normalize(lightPos - shadePoint);
-			Ray ray = Ray(shadePoint + ws, ws);
-			Intersection lightIntersction = Scene::intersect(ray);
-			if (lightIntersction.happened && lightIntersction.obj->hasEmit() && (lightIntersction.coords - lightPos).norm()< EPSILON)
+			Vector3f x = lightSample.coords;
+			Vector3f ws = normalize(x - shadePoint);
+			Ray rayToLight = Ray(shadePoint + ws, ws);
+			Intersection lightInter = Scene::intersect(rayToLight);
+			if (lightInter.happened && lightInter.obj->hasEmit() && (lightInter.coords - x).norm()< EPSILON)
 			{
-				auto emit = lightSample.emit / 255.0f;
-				auto d2 = (lightPos - shadePoint).norm();
+				auto emit = lightSample.emit;
+				auto d = x - shadePoint;
+				float d2 = dotProduct(d, d);
 				auto f_r = m->eval(wo, ws, N);
 				auto cp = std::max(0.0f, dotProduct(ws, N));
-				Vector3f NN = lightIntersction.normal;
-				lightIntersction.obj->getSurfaceProperties(lightPos, ws, index, uv, NN, st);
+				Vector3f NN = lightInter.normal;
+				lightInter.obj->getSurfaceProperties(x, ws, index, uv, NN, st);
 				auto cl = std::max(0.0f, dotProduct(-ws, NN));
 				L_dir = emit * f_r * cp * cl /( d2 * lightPdf + EPSILON);
 			}
 		}
-		hitColor = L_dir;
+		Vector3f L_indir = Vector3f(0);
+		{
+			float ksi = get_random_float();
+			if (ksi > RussianRoulette)
+				L_indir = 0.0;
+			else {
+				auto wi = normalize(m->sample(wo, N));
+				Ray rayToQ = Ray(shadePoint + wi, wi);
+				Intersection objInter = Scene::intersect(rayToQ);
+				if (objInter.happened && !objInter.obj->hasEmit()) {
+					auto pdf = m->pdf(wo, wi, N);
+					auto f_r = m->eval(wo, wi, N);
+					auto c = std::max(0.0f, dotProduct(wi, N));
+					auto sq = castRay(rayToQ, depth);
+					L_indir = sq * f_r * c / (pdf * RussianRoulette);
+				}
+			}
+		}
+		hitColor = L_dir + L_indir;
 	}
 	return hitColor;
 }

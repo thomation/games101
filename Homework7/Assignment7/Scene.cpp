@@ -108,10 +108,8 @@ Vector3f Scene::Shade(const Intersection& p, const Vector3f& wo, int depth) cons
 	Vector3f L_indir = Vector3f(0);
 	{
 		float ksi = get_random_float();
-		if (ksi > RussianRoulette)
-			L_indir = 0.0;
-		else {
-			auto wi = m->sample(wo, N);
+		if(ksi <= RussianRoulette) {
+			auto wi = normalize(m->sample(wo, N));
 			Ray rayToQ = Ray(shadePoint + wi * 0.1, wi);
 			Intersection q = Scene::intersect(rayToQ);
 			if (q.happened && !q.obj->hasEmit()) {

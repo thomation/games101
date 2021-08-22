@@ -53,7 +53,7 @@ public:
         return I - 2 * dotProduct(I, N) * N;
     }
 
-
+    Vector3f Shade(const Intersection& inter, const Vector3f& wi, int depth) const;
 
 // Compute refraction direction using Snell's law
 //

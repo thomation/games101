@@ -24,7 +24,7 @@ void Renderer::Render(const Scene& scene)
     int m = 0;
 
     // change the spp value to change sample ammount
-    int spp = 128;
+    int spp = 32;
     std::cout << "SPP: " << spp << "\n"; 
 
 #pragma omp parallel for

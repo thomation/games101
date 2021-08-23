@@ -74,7 +74,7 @@ public:
 		return (x && y && z);
 	}
 
-	bool Inside(const Vector3f& p, const Bounds3& b)
+	bool Inside(const Vector3f& p, const Bounds3& b) const
 	{
 		return (p.x >= b.pMin.x && p.x <= b.pMax.x && p.y >= b.pMin.y &&
 			p.y <= b.pMax.y && p.z >= b.pMin.z && p.z <= b.pMax.z);
@@ -93,40 +93,85 @@ public:
 inline bool Bounds3::IntersectP(const Ray& ray, const Vector3f& invDir,
 	const std::array<int, 3>& dirIsNeg) const
 {
+	if (Inside(ray.origin, *this))
+		return true;
+	Vector3f ptOnPlane;
+	float t;
+	if (std::abs(ray.direction.x) > 0.00001f)
+	{
+		if (dirIsNeg[0])
+			t = (pMin.x - ray.origin.x) * invDir.x;
+		else
+			t = (pMax.x - ray.origin.x) * invDir.x;
+		if (t >= 0)
+		{
+			ptOnPlane = ray.origin + t * ray.direction;
+			if (ptOnPlane.y > pMin.y && ptOnPlane.y < pMax.y && ptOnPlane.z > pMin.z && ptOnPlane.z < pMax.z)
+				return true;
+		}
+	}
+	if (std::abs(ray.direction.y) > 0.00001f)
+	{
+		if (dirIsNeg[1])
+			t = (pMin.y - ray.origin.y) * invDir.y;
+		else
+			t = (pMax.y - ray.origin.y) * invDir.y;
+		if (t >= 0)
+		{
+			ptOnPlane = ray.origin + t * ray.direction;
+			if (ptOnPlane.x >= pMin.x && ptOnPlane.x <= pMax.x && ptOnPlane.z >= pMin.z && ptOnPlane.z <= pMax.z)
+				return true;
+		}
+	}
+	if (std::abs(ray.direction.z) > 0.00001f)
+	{
+		if (dirIsNeg[2])
+			t = (pMin.z - ray.origin.z) * invDir.z;
+		else
+			t = (pMax.z - ray.origin.z) * invDir.z;
+		if (t >= 0)
+		{
+			ptOnPlane = ray.origin + t * ray.direction;
+			if (ptOnPlane.y >= pMin.y && ptOnPlane.y <= pMax.y && ptOnPlane.x >= pMin.x && ptOnPlane.x <= pMax.x)
+				return true;
+		}
+	}
+	return false;
 	// invDir: ray direction(x,y,z), invDir=(1.0/x,1.0/y,1.0/z), use this because Multiply is faster that Division
 	// dirIsNeg: ray direction(x,y,z), dirIsNeg=[int(x>0),int(y>0),int(z>0)], use this to simplify your logic
 	// TODO test if ray bound intersects
-	float t_Min_x = (pMin.x - ray.origin.x) * invDir[0];
-	float t_Min_y = (pMin.y - ray.origin.y) * invDir[1];
-	float t_Min_z = (pMin.z - ray.origin.z) * invDir[2];
-	float t_Max_x = (pMax.x - ray.origin.x) * invDir[0];
-	float t_Max_y = (pMax.y - ray.origin.y) * invDir[1];
-	float t_Max_z = (pMax.z - ray.origin.z) * invDir[2];
-	if (!dirIsNeg[0])
-	{
-		float t = t_Min_x;
-		t_Min_x = t_Max_x;
-		t_Max_x = t;
-	}
-	if (!dirIsNeg[1])
-	{
-		float t = t_Min_y;
-		t_Min_y = t_Max_y;
-		t_Max_y = t;
-	}
-	if (!dirIsNeg[2])
-	{
-		float t = t_Min_z;
-		t_Min_z = t_Max_z;
-		t_Max_z = t;
-	}
+	//float t_Min_x = (pMin.x - ray.origin.x) * invDir[0];
+	//float t_Min_y = (pMin.y - ray.origin.y) * invDir[1];
+	//float t_Min_z = (pMin.z - ray.origin.z) * invDir[2];
+	//float t_Max_x = (pMax.x - ray.origin.x) * invDir[0];
+	//float t_Max_y = (pMax.y - ray.origin.y) * invDir[1];
+	//float t_Max_z = (pMax.z - ray.origin.z) * invDir[2];
+	//if (!dirIsNeg[0])
+	//{
+	//	float t = t_Min_x;
+	//	t_Min_x = t_Max_x;
+	//	t_Max_x = t;
+	//}
+	//if (!dirIsNeg[1])
+	//{
+	//	float t = t_Min_y;
+	//	t_Min_y = t_Max_y;
+	//	t_Max_y = t;
+	//}
+	//if (!dirIsNeg[2])
+	//{
+	//	float t = t_Min_z;
+	//	t_Min_z = t_Max_z;
+	//	t_Max_z = t;
+	//}
 
-	float t_enter = std::max(t_Min_x, std::max(t_Min_y, t_Min_z));
-	float t_exit = std::min(t_Max_x, std::min(t_Max_y, t_Max_z));
-	if (t_enter <= t_exit && t_exit >= 0)
-		return true;
-	else
-		return false;
+	//float t_enter = std::max(t_Min_x, std::max(t_Min_y, t_Min_z));
+	//float t_exit = std::min(t_Max_x, std::min(t_Max_y, t_Max_z));
+	//if (t_enter <= t_exit && t_exit >= 0)
+	//	return true;
+	//else
+	//	return false;
+
 }
 
 inline Bounds3 Union(const Bounds3& b1, const Bounds3& b2)

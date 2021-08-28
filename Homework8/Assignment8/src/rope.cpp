@@ -20,7 +20,12 @@ namespace CGL {
         }
         auto step = (end - start) / (num_nodes - 1);
         for(int i = 0; i < num_nodes; i ++)
-            masses.push_back(new Mass(start + step * i, node_mass, false));
+        {
+            auto mass = new Mass(start + step * i, node_mass, false);
+            std::cout << mass->velocity << std::endl;
+            std::cout << mass->position << std::endl;
+            masses.push_back(mass);
+        }
         for (auto &i : pinned_nodes) {
             masses[i]->pinned = true;
         }
@@ -35,14 +40,27 @@ namespace CGL {
         for (auto &s : springs)
         {
             // TODO (Part 2): Use Hooke's law to calculate the force on a node
+            auto d = s->m2->position - s->m1->position;
+            auto f21 = -s->k * d.unit() * (d.norm() - s->rest_length);
+            s->m1->forces -= f21;
+            s->m2->forces += f21;
         }
 
+        const double kd = 0.005;
         for (auto &m : masses)
         {
             if (!m->pinned)
             {
                 // TODO (Part 2): Add the force due to gravity, then compute the new velocity and position
-
+                m->forces += gravity * m->mass;
+                m->forces += -kd * m->velocity;
+                Vector2D a = m->forces / m->mass;
+                // for explict
+                // m->position += m->velocity * delta_t;
+                // m->velocity += a * delta_t;
+                // for semi-implict
+                m->velocity += a * delta_t;
+                m->position += m->velocity * delta_t;
                 // TODO (Part 2): Add global damping
             }
 

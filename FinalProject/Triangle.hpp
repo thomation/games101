@@ -107,7 +107,7 @@ public:
             }
 
             auto new_mat =
-                new Material(MaterialType::DIFFUSE_AND_GLOSSY,
+                new Material(MaterialType::SUBSURFACE_SCATTERING,
                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
             new_mat->Kd = 0.6;
             new_mat->Ks = 0.0;

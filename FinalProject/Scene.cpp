@@ -99,7 +99,7 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
                 hitColor = castRay(Ray(reflectionRayOrig, reflectionDirection),depth + 1) * kr;
                 break;
             }
-            default:
+           case DIFFUSE_AND_GLOSSY :
             {
                 // [comment]
                 // We use the Phong illumation model int the default case. The phong model
@@ -140,6 +140,10 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
                 hitColor = lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
                 break;
             }
+           default : 
+           {
+               hitColor = Vector3f(1.0, 1.0, 1.0);
+           }
         }
     }
 

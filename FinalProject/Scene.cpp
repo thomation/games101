@@ -73,79 +73,95 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
         switch (m->getType()) {
             case REFLECTION_AND_REFRACTION:
             {
-                Vector3f reflectionDirection = normalize(reflect(ray.direction, N));
-                Vector3f refractionDirection = normalize(refract(ray.direction, N, m->ior));
-                Vector3f reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
-                                             hitPoint - N * EPSILON :
-                                             hitPoint + N * EPSILON;
-                Vector3f refractionRayOrig = (dotProduct(refractionDirection, N) < 0) ?
-                                             hitPoint - N * EPSILON :
-                                             hitPoint + N * EPSILON;
-                Vector3f reflectionColor = castRay(Ray(reflectionRayOrig, reflectionDirection), depth + 1);
-                Vector3f refractionColor = castRay(Ray(refractionRayOrig, refractionDirection), depth + 1);
-                float kr;
-                fresnel(ray.direction, N, m->ior, kr);
-                hitColor = reflectionColor * kr + refractionColor * (1 - kr);
+                hitPoint = computeReflectionAndFefraction(ray, depth, hitPoint, N, m);
                 break;
             }
             case REFLECTION:
             {
-                float kr;
-                fresnel(ray.direction, N, m->ior, kr);
-                Vector3f reflectionDirection = reflect(ray.direction, N);
-                Vector3f reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
-                                             hitPoint + N * EPSILON :
-                                             hitPoint - N * EPSILON;
-                hitColor = castRay(Ray(reflectionRayOrig, reflectionDirection),depth + 1) * kr;
-                break;
+                hitColor = computeReflection(ray, depth, hitPoint, N, m);
+				break;
             }
            case DIFFUSE_AND_GLOSSY :
             {
-                // [comment]
-                // We use the Phong illumation model int the default case. The phong model
-                // is composed of a diffuse and a specular reflection component.
-                // [/comment]
-                Vector3f lightAmt = 0, specularColor = 0;
-                Vector3f shadowPointOrig = (dotProduct(ray.direction, N) < 0) ?
-                                           hitPoint + N * EPSILON :
-                                           hitPoint - N * EPSILON;
-                // [comment]
-                // Loop over all lights in the scene and sum their contribution up
-                // We also apply the lambert cosine law
-                // [/comment]
-                for (uint32_t i = 0; i < get_lights().size(); ++i)
-                {
-                    auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-                    if (area_ptr)
-                    {
-                        // Do nothing for this assignment
-                    }
-                    else
-                    {
-                        Vector3f lightDir = get_lights()[i]->position - hitPoint;
-                        // square of the distance between hitPoint and the light
-                        float lightDistance2 = dotProduct(lightDir, lightDir);
-                        lightDir = normalize(lightDir);
-                        float LdotN = std::max(0.f, dotProduct(lightDir, N));
-                        Object *shadowHitObject = nullptr;
-                        float tNearShadow = kInfinity;
-                        // is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
-                        bool inShadow = bvh->Intersect(Ray(shadowPointOrig, lightDir)).happened;
-                        lightAmt += (1 - inShadow) * get_lights()[i]->intensity * LdotN;
-                        Vector3f reflectionDirection = reflect(-lightDir, N);
-                        specularColor += powf(std::max(0.f, -dotProduct(reflectionDirection, ray.direction)),
-                                              m->specularExponent) * get_lights()[i]->intensity;
-                    }
-                }
-                hitColor = lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
+			   hitColor = computeDiffuseAndGlossy(ray, depth, hitPoint, N, m, st, hitObject);
                 break;
             }
            default : 
            {
-               hitColor = Vector3f(1.0, 1.0, 1.0);
+               hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
     }
 
     return hitColor;
+}
+Vector3f Scene::computeReflectionAndFefraction(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const
+{
+	Vector3f reflectionDirection = normalize(reflect(ray.direction, N));
+	Vector3f refractionDirection = normalize(refract(ray.direction, N, m->ior));
+	Vector3f reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
+								 hitPoint - N * EPSILON :
+								 hitPoint + N * EPSILON;
+	Vector3f refractionRayOrig = (dotProduct(refractionDirection, N) < 0) ?
+								 hitPoint - N * EPSILON :
+								 hitPoint + N * EPSILON;
+	Vector3f reflectionColor = castRay(Ray(reflectionRayOrig, reflectionDirection), depth + 1);
+	Vector3f refractionColor = castRay(Ray(refractionRayOrig, refractionDirection), depth + 1);
+	float kr;
+	fresnel(ray.direction, N, m->ior, kr);
+	return reflectionColor * kr + refractionColor * (1 - kr);
+}
+Vector3f Scene::computeReflection(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const
+{
+    float kr;
+	fresnel(ray.direction, N, m->ior, kr);
+	Vector3f reflectionDirection = reflect(ray.direction, N);
+	Vector3f reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
+								 hitPoint + N * EPSILON :
+								 hitPoint - N * EPSILON;
+	return  castRay(Ray(reflectionRayOrig, reflectionDirection),depth + 1) * kr;
+}
+Vector3f Scene::computeDiffuseAndGlossy(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const
+{
+	// [comment]
+	// We use the Phong illumation model int the default case. The phong model
+	// is composed of a diffuse and a specular reflection component.
+	// [/comment]
+	Vector3f lightAmt = 0, specularColor = 0;
+	Vector3f shadowPointOrig = (dotProduct(ray.direction, N) < 0) ?
+							   hitPoint + N * EPSILON :
+							   hitPoint - N * EPSILON;
+	// [comment]
+	// Loop over all lights in the scene and sum their contribution up
+	// We also apply the lambert cosine law
+	// [/comment]
+	for (uint32_t i = 0; i < get_lights().size(); ++i)
+	{
+		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+		if (area_ptr)
+		{
+			// Do nothing for this assignment
+		}
+		else
+		{
+			Vector3f lightDir = get_lights()[i]->position - hitPoint;
+			// square of the distance between hitPoint and the light
+			float lightDistance2 = dotProduct(lightDir, lightDir);
+			lightDir = normalize(lightDir);
+			float LdotN = std::max(0.f, dotProduct(lightDir, N));
+			Object *shadowHitObject = nullptr;
+			float tNearShadow = kInfinity;
+			// is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
+			bool inShadow = bvh->Intersect(Ray(shadowPointOrig, lightDir)).happened;
+			lightAmt += (1 - inShadow) * get_lights()[i]->intensity * LdotN;
+			Vector3f reflectionDirection = reflect(-lightDir, N);
+			specularColor += powf(std::max(0.f, -dotProduct(reflectionDirection, ray.direction)),
+								  m->specularExponent) * get_lights()[i]->intensity;
+		}
+	}
+	return lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
+}
+Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const
+{
+	return hitObject->evalDiffuseColor(st) * m->Kd;
 }

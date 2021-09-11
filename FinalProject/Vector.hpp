@@ -30,7 +30,8 @@ public:
     double       operator[](int index) const;
     double&      operator[](int index);
 
-
+    Vector3f Inverse() const  { return Vector3f(1.0 / x, 1.0 / y, 1.0 / z); }
+    
     static Vector3f Min(const Vector3f &p1, const Vector3f &p2) {
         return Vector3f(std::min(p1.x, p2.x), std::min(p1.y, p2.y),
                        std::min(p1.z, p2.z));

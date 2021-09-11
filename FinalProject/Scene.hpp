@@ -38,6 +38,7 @@ public:
     Vector3f computeReflectionAndFefraction(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const;
     Vector3f computeReflection(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const;
     Vector3f computeDiffuseAndGlossy(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const;
+    void samplePoint(const Vector3f& source, float R, const Vector3f& N, Intersection& target, float& pdf) const;
     Vector3f computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const;
     bool trace(const Ray &ray, const std::vector<Object*> &objects, float &tNear, uint32_t &index, Object **hitObject);
     std::tuple<Vector3f, Vector3f> HandleAreaLight(const AreaLight &light, const Vector3f &hitPoint, const Vector3f &N,
@@ -81,34 +82,4 @@ public:
 
 
 
-    // Compute Fresnel equation
-//
-// \param I is the incident view direction
-//
-// \param N is the normal at the intersection point
-//
-// \param ior is the material refractive index
-//
-// \param[out] kr is the amount of light reflected
-    void fresnel(const Vector3f &I, const Vector3f &N, const float &ior, float &kr) const
-    {
-        float cosi = clamp(-1, 1, dotProduct(I, N));
-        float etai = 1, etat = ior;
-        if (cosi > 0) {  std::swap(etai, etat); }
-        // Compute sini using Snell's law
-        float sint = etai / etat * sqrtf(std::max(0.f, 1 - cosi * cosi));
-        // Total internal reflection
-        if (sint >= 1) {
-            kr = 1;
-        }
-        else {
-            float cost = sqrtf(std::max(0.f, 1 - sint * sint));
-            cosi = fabsf(cosi);
-            float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
-            float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
-            kr = (Rs * Rs + Rp * Rp) / 2;
-        }
-        // As a consequence of the conservation of energy, transmittance is given by:
-        // kt = 1 - kr;
-    }
 };

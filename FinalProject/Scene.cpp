@@ -218,9 +218,11 @@ static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
 }
 static Vector3f Rd(const Vector3f& r, const Vector3f& D)
 {
+	if (dotProduct(r, r) == 0.0)
+		return 0;
 	Vector3f e1 = -r * D.Inverse();
 	Vector3f e3 = -r * D.Inverse() / 3.0;
-	Vector3f m = D* r* M_PI * 8 + Vector3f(EPSILON);
+	Vector3f m = D * r * M_PI * 8;
 	auto ret = Vector3f(std::exp(e1.x) + std::exp(e3.x), std::exp(e1.y) + std::exp(e3.y), std::exp(e1.z) + std::exp(e3.z));
 	return ret * m.Inverse();
 }
@@ -260,7 +262,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	Vector3f lightAmt = 0, specularColor = 0;
 	Intersection sampleInter;
 	float pdf;
-	samplePoint(po, 0.15, No, sampleInter , pdf);
+	samplePoint(po, 0.8, No, sampleInter , pdf);
 	if (!sampleInter.happened)
 	{
 		//std::cout << "no sample" << std::endl;

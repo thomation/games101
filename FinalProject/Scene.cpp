@@ -4,10 +4,32 @@
 
 #include "Scene.hpp"
 
+const float R_MAX = 100;
+const float R_STEP = 0.1;
+// For Marble
+const float Fdr = -1.44 / 1.3 / 1.3 + 0.71 / 1.3 + 0.668 + 0.0636 * 1.3;
+//const float A = (1 + Fdr) / (1 - Fdr);
+const float A = 0.5;
+const Vector3f SigmaS = Vector3f(2.19, 2.62, 3.0);
+const Vector3f SigmaA = Vector3f(0.0021, 0.0041, 0.0071);
+const Vector3f SigmaT = SigmaS + SigmaA;
+const Vector3f Alpha = Vector3f(SigmaS.x / SigmaT.x, SigmaS.y / SigmaT.y, SigmaS.z / SigmaT.z);
+const Vector3f SigmaTR = SigmaT * Vector3f(std::sqrt(3 * (1 - Alpha.x)), std::sqrt(3 * (1 - Alpha.y)), std::sqrt(3 * (1 - Alpha.z)));
+const Vector3f Ld= SigmaTR.Inverse();
+const Vector3f D = Ld / (3.5 + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33));
+
 
 void Scene::buildBVH() {
     printf(" - Generating BVH...\n\n");
     this->bvh = new BVHAccel(objects, 1, BVHAccel::SplitMethod::NAIVE);
+}
+void Scene::computeCDF()
+{
+	for (float r = 0; r < R_MAX / R_STEP ; r += R_STEP)
+	{
+		auto cdfr = 1 - std::exp(-r) / 4 - std::exp(-r / 3) * 3 / 4;
+		this->cdfs.push_back(cdfr);
+	}
 }
 
 Intersection Scene::intersect(const Ray &ray) const
@@ -192,18 +214,6 @@ Vector3f Scene::computeDiffuseAndGlossy(const Ray &ray, int depth, const Vector3
 	}
 	return lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
 }
-const int SAMPLE_NUM = 10;
-// For Marble
-const float Fdr = -1.44 / 1.3 / 1.3 + 0.71 / 1.3 + 0.668 + 0.0636 * 1.3;
-const float A = (1 + Fdr) / (1 - Fdr);
-const Vector3f SigmaS = Vector3f(2.19, 2.62, 3.0);
-const Vector3f SigmaA = Vector3f(0.0021, 0.0041, 0.0071);
-const Vector3f SigmaT = SigmaS + SigmaA;
-const Vector3f Alpha = Vector3f(SigmaS.x / SigmaT.x, SigmaS.y / SigmaT.y, SigmaS.z / SigmaT.z);
-const Vector3f SigmaTR = SigmaT * Vector3f(std::sqrt(3 * (1 - Alpha.x)), std::sqrt(3 * (1 - Alpha.y)), std::sqrt(3 * (1 - Alpha.z)));
-const Vector3f Ld= SigmaTR.Inverse();
-const Vector3f D = Ld / (3.5 + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33));
-
 static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
 	Vector3f B, C;
 	if (std::fabs(N.x) > std::fabs(N.y)) {
@@ -227,7 +237,10 @@ void Scene::samplePoint(const Vector3f & source, float R, const Vector3f& N, Int
 	Ray ray = Ray(pos, -N);
     target = Scene::intersect(ray);
 	float area = r * r * M_PI;
-	pdf = 1.0f / area;
+	auto dot = dotProduct(N, target.normal);
+	if (dot < 0)
+		dot = EPSILON;
+	pdf = 1.0f / area * dot ;
 }
 static Vector3f Rd(const Vector3f& r)
 {
@@ -250,37 +263,39 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
-	Vector3f sumLightColor;
+	Vector3f sumLightColor = Vector3f(0);
 	Vector2f ist; // st coordinates
 	uint32_t index = 0;
 	Vector2f iuv;
-	for (int j = 0; j < SAMPLE_NUM; j++)
+	Vector3f lightAmt = 0, specularColor = 0;
+	Intersection sampleInter;
+	float pdf;
+	samplePoint(po, 0.5, No, sampleInter , pdf);
+	if (!sampleInter.happened)
+		return sumLightColor;
+	for (uint32_t i = 0; i < get_lights().size(); ++i)
 	{
-		Vector3f lightAmt = 0, specularColor = 0;
-		Intersection inter;
-		float pdf;
-		samplePoint(po, 0.1, No, inter, pdf);
+		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+		if (area_ptr)
+			continue;
+		
+		Vector3f inLightDir = sampleInter.coords - get_lights()[i]->position ;
+		inLightDir = normalize(inLightDir);
+		auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
 		if (!inter.happened)
 			continue;
-		for (uint32_t i = 0; i < get_lights().size(); ++i)
-		{
-			auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-			if (area_ptr)
-				continue;
-			Material* mi = inter.m;
-			Object* inObject = inter.obj;
-			const Vector3f& pi = inter.coords;
 
-			Vector3f Ni = inter.normal; // normal
-			Vector3f inLightDir = get_lights()[i]->position - pi;
-			inLightDir = normalize(inLightDir);
-			inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
-			float LdotN = std::max(0.f, dotProduct(inLightDir, Ni));
-			auto light =  get_lights()[i]->intensity * LdotN;
-			sumLightColor += light * S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior) / pdf;
-		}
+		Material* mi = inter.m;
+		Object* inObject = inter.obj;
+		const Vector3f& pi = inter.coords;
+		Vector3f Ni = inter.normal; // normal
 
+		inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
+		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
+		auto light =  get_lights()[i]->intensity * LdotN;
+		sumLightColor += light * S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior) / pdf;
+		//sumLightColor += light / pdf;
 	}
-	return sumLightColor;
 
+	return sumLightColor;
 }

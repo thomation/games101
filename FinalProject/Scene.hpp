@@ -34,6 +34,7 @@ public:
     Intersection intersect(const Ray& ray) const;
     BVHAccel *bvh;
     void buildBVH();
+    void computeCDF();
     Vector3f castRay(const Ray &ray, int depth) const;
     Vector3f computeReflectionAndFefraction(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const;
     Vector3f computeReflection(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const;
@@ -49,6 +50,7 @@ public:
     // creating the scene (adding objects and lights)
     std::vector<Object* > objects;
     std::vector<std::unique_ptr<Light> > lights;
+    std::vector<float> cdfs;
 
     // Compute reflection direction
     Vector3f reflect(const Vector3f &I, const Vector3f &N) const

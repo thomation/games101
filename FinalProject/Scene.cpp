@@ -6,18 +6,6 @@
 
 const float R_MAX = 100;
 const float R_STEP = 0.1;
-// For Marble
-const float Fdr = -1.44 / 1.3 / 1.3 + 0.71 / 1.3 + 0.668 + 0.0636 * 1.3;
-//const float A = (1 + Fdr) / (1 - Fdr);
-const float A = 0.5;
-const Vector3f SigmaS = Vector3f(2.19, 2.62, 3.0);
-const Vector3f SigmaA = Vector3f(0.0021, 0.0041, 0.0071);
-const Vector3f SigmaT = SigmaS + SigmaA;
-const Vector3f Alpha = Vector3f(SigmaS.x / SigmaT.x, SigmaS.y / SigmaT.y, SigmaS.z / SigmaT.z);
-const Vector3f SigmaTR = SigmaT * Vector3f(std::sqrt(3 * (1 - Alpha.x)), std::sqrt(3 * (1 - Alpha.y)), std::sqrt(3 * (1 - Alpha.z)));
-//const Vector3f Ld= SigmaTR.Inverse();
-const Vector3f Ld = Vector3f(2.1, 2.1, 2.1);
-const Vector3f D = Ld / (3.5 + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33));
 
 
 void Scene::buildBVH() {
@@ -228,39 +216,40 @@ static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
 	B = crossProduct(C, N);
 	return a.x * B + a.y * C + a.z * N;
 }
+static Vector3f Rd(const Vector3f& r, const Vector3f& D)
+{
+	Vector3f e1 = -r * D.Inverse();
+	Vector3f e3 = -r * D.Inverse() / 3.0;
+	Vector3f m = D* r* M_PI * 8 + Vector3f(EPSILON);
+	auto ret = Vector3f(std::exp(e1.x) + std::exp(e3.x), std::exp(e1.y) + std::exp(e3.y), std::exp(e1.z) + std::exp(e3.z));
+	return ret * m.Inverse();
+}
 void Scene::samplePoint(const Vector3f & source, float R, const Vector3f& N, Intersection & target, float & pdf) const
 {
 	float theta = 2.0 * M_PI * get_random_float();
 	float r =  R * get_random_float();
-	Vector3f local_dir(std::cos(theta), std::sin(theta), 1.0);
-	auto dir = toWorld(local_dir, N);
-	Vector3f pos = source + dir;
+	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
+	auto dir = toWorld(normalize(local_dir), N);
+	Vector3f pos = source + dir * r;
+	//Vector3f T = normalize(pos - source);
+	//auto d = dotProduct(T, N);
+	//std::cout << d << std::endl;
 	Ray ray = Ray(pos, -N);
     target = Scene::intersect(ray);
-	float area = r * r * M_PI;
 	auto dot = dotProduct(N, target.normal);
 	if (dot < 0)
 		dot = EPSILON;
-	pdf = 1.0f / area * dot ;
-}
-static Vector3f Rd(const Vector3f& r)
-{
-	Vector3f e1 = -r * D.Inverse();
-	Vector3f e3 = -r * D.Inverse() / 3.0;
-	Vector3f m = D* r* M_PI * 8;
-	auto ret = Vector3f(std::exp(e1.x) + std::exp(e3.x), std::exp(e1.y) + std::exp(e3.y), std::exp(e1.z) + std::exp(e3.z));
-	//std::cout << ret << std::endl;
-	return ret;
+	pdf = 1.0f * dot / (M_PI * R * R + EPSILON);
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
-	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori)
+	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
 {
-    float fo;
-	fresnel(wo, No, ioro, fo);
-	float fi;
-	fresnel(wi, Ni, iori, fi);
+    float kro;
+	fresnel(wo, No, ioro, kro);
+	float kri;
+	fresnel(wi, Ni, iori, kri);
 	float d = std::abs(po.x - pi.x) + std::abs(po.y - pi.y) + std::abs(po.z - pi.z);
-	return Rd(d) * fo * fi / M_PI;
+	return Rd(d, D) * (1 - kro) * (1 - kri) / M_PI;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
@@ -271,9 +260,12 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	Vector3f lightAmt = 0, specularColor = 0;
 	Intersection sampleInter;
 	float pdf;
-	samplePoint(po, 0.5, No, sampleInter , pdf);
+	samplePoint(po, 0.15, No, sampleInter , pdf);
 	if (!sampleInter.happened)
+	{
+		//std::cout << "no sample" << std::endl;
 		return sumLightColor;
+	}
 	for (uint32_t i = 0; i < get_lights().size(); ++i)
 	{
 		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
@@ -285,7 +277,6 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
 		if (!inter.happened)
 			continue;
-
 		Material* mi = inter.m;
 		Object* inObject = inter.obj;
 		const Vector3f& pi = inter.coords;
@@ -294,8 +285,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
 		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
 		auto light =  get_lights()[i]->intensity * LdotN;
-		sumLightColor += light * S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior) / pdf;
-		//sumLightColor += light / pdf;
+		sumLightColor += light * S(po, -ray.direction, No, 1.0 / mo->ior, pi, inLightDir, Ni, mi->ior, mi->D) / pdf;
 	}
 
 	return sumLightColor;

@@ -15,7 +15,8 @@ const Vector3f SigmaA = Vector3f(0.0021, 0.0041, 0.0071);
 const Vector3f SigmaT = SigmaS + SigmaA;
 const Vector3f Alpha = Vector3f(SigmaS.x / SigmaT.x, SigmaS.y / SigmaT.y, SigmaS.z / SigmaT.z);
 const Vector3f SigmaTR = SigmaT * Vector3f(std::sqrt(3 * (1 - Alpha.x)), std::sqrt(3 * (1 - Alpha.y)), std::sqrt(3 * (1 - Alpha.z)));
-const Vector3f Ld= SigmaTR.Inverse();
+//const Vector3f Ld= SigmaTR.Inverse();
+const Vector3f Ld = Vector3f(2.1, 2.1, 2.1);
 const Vector3f D = Ld / (3.5 + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33));
 
 

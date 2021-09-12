@@ -204,12 +204,25 @@ const Vector3f SigmaTR = SigmaT * Vector3f(std::sqrt(3 * (1 - Alpha.x)), std::sq
 const Vector3f Ld= SigmaTR.Inverse();
 const Vector3f D = Ld / (3.5 + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33));
 
+static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
+	Vector3f B, C;
+	if (std::fabs(N.x) > std::fabs(N.y)) {
+		float invLen = 1.0f / std::sqrt(N.x * N.x + N.z * N.z);
+		C = Vector3f(N.z * invLen, 0.0f, -N.x * invLen);
+	}
+	else {
+		float invLen = 1.0f / std::sqrt(N.y * N.y + N.z * N.z);
+		C = Vector3f(0.0f, N.z * invLen, -N.y * invLen);
+	}
+	B = crossProduct(C, N);
+	return a.x * B + a.y * C + a.z * N;
+}
 void Scene::samplePoint(const Vector3f & source, float R, const Vector3f& N, Intersection & target, float & pdf) const
 {
 	float theta = 2.0 * M_PI * get_random_float();
 	float r =  R * get_random_float();
-	Vector3f dir(std::cos(theta), std::sin(theta), 1.0);
-	// TODO: compute world dir
+	Vector3f local_dir(std::cos(theta), std::sin(theta), 1.0);
+	auto dir = toWorld(local_dir, N);
 	Vector3f pos = source + dir;
 	Ray ray = Ray(pos, -N);
     target = Scene::intersect(ray);
@@ -221,7 +234,9 @@ static Vector3f Rd(const Vector3f& r)
 	Vector3f e1 = -r * D.Inverse();
 	Vector3f e3 = -r * D.Inverse() / 3.0;
 	Vector3f m = D* r* M_PI * 8;
-	return Vector3f(std::exp(e1.x) + std::exp(e3.x), std::exp(e1.y) + std::exp(e3.y), std::exp(e1.z) + std::exp(e3.z));
+	auto ret = Vector3f(std::exp(e1.x) + std::exp(e3.x), std::exp(e1.y) + std::exp(e3.y), std::exp(e1.z) + std::exp(e3.z));
+	//std::cout << ret << std::endl;
+	return ret;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori)
@@ -233,7 +248,7 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float d = std::abs(po.x - pi.x) + std::abs(po.y - pi.y) + std::abs(po.z - pi.z);
 	return Rd(d) * fo * fi / M_PI;
 }
-Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const
+Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
 	Vector3f sumLightColor;
 	Vector2f ist; // st coordinates
@@ -244,7 +259,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		Vector3f lightAmt = 0, specularColor = 0;
 		Intersection inter;
 		float pdf;
-		samplePoint(hitPoint, 1, N, inter, pdf);
+		samplePoint(po, 0.1, No, inter, pdf);
 		if (!inter.happened)
 			continue;
 		for (uint32_t i = 0; i < get_lights().size(); ++i)
@@ -257,10 +272,12 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 			const Vector3f& pi = inter.coords;
 
 			Vector3f Ni = inter.normal; // normal
-			Vector3f lightDir = get_lights()[i]->position - inter.coords;
-			lightDir = normalize(lightDir);
-			inObject->getSurfaceProperties(pi, lightDir, index, iuv, Ni, ist);
-			sumLightColor += S(hitPoint, ray.direction, N, m->ior, inter.coords, lightDir, Ni, mi->ior) / pdf;
+			Vector3f inLightDir = get_lights()[i]->position - pi;
+			inLightDir = normalize(inLightDir);
+			inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
+			float LdotN = std::max(0.f, dotProduct(inLightDir, Ni));
+			auto light =  get_lights()[i]->intensity * LdotN;
+			sumLightColor += light * S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior) / pdf;
 		}
 
 	}

@@ -432,10 +432,6 @@ static float sampleR(float r, float d)
 	const float distance = LUT[ib] * (1 - offset + ib) + LUT[iu] * (offset - ib);
 	return distance * d;
 }
-static float pdfR(float r, float d)
-{
-	return Rd(r, d) * M_PI * 2.0f * r;
-}
 bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vector3f& N, Vector3f & target, float & pdf) const
 {
 	//get one d with random channel
@@ -454,28 +450,22 @@ bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vecto
 	//std::cout << d << std::endl;
 	Ray ray = Ray(pos, -N);
     Intersection inter = Scene::intersect(ray);
-	target = inter.coords;
-	auto dot = dotProduct(N, inter.normal);
-	//std::cout << dot << std::endl;
-	if (dot <= 0)
+	if (!inter.happened)
 		return false;
-	pdf = pdfR(r, d) * dot;
+	target = inter.coords;
+	auto sN2tN = dotProduct(N, inter.normal);
+	if (sN2tN <= 0)
+		return false;
+	pdf = Rd(r, d) * sN2tN;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
 {
-    //float kro;
-	//fresnel(wo, No, ioro, kro);
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	//float d = std::abs(po.x - pi.x) + std::abs(po.y - pi.y) + std::abs(po.z - pi.z);
 	float d = sqrt(dotProduct(po - pi, po - pi));
 	return Rd(d, D) * (1 - kri) / M_PI;
-}
-static Vector3f S(const Vector3f& po, const Vector3f& pi, const Vector3f& D)
-{
-	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) / M_PI;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {

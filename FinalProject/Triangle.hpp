@@ -110,10 +110,10 @@ public:
                 new Material(MaterialType::SUBSURFACE_SCATTERING,
                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
             new_mat->Kd = 0.6;
-            new_mat->Ks = 0.0;
-            new_mat->specularExponent = 0;
+            new_mat->Ks = 0.2;
+            new_mat->specularExponent = 5;
             new_mat->ior = 1.33;
-            new_mat->computeD(Vector3f(0.5, 0.5, 0.5));
+            new_mat->computeD(Vector3f(0.6, 0.6, 0.6));
 
             triangles.emplace_back(face_vertices[0], face_vertices[1],
                                    face_vertices[2], new_mat);

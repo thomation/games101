@@ -18,15 +18,12 @@ public:
     float Kd, Ks;
     float specularExponent;
     //Texture tex;
-    Vector3f D;
-    Vector3f m_ld;
 
     inline Material(MaterialType t=DIFFUSE_AND_GLOSSY, Vector3f c=Vector3f(1,1,1), Vector3f e=Vector3f(0,0,0));
     inline MaterialType getType();
     inline Vector3f getColor();
     inline Vector3f getColorAt(double u, double v);
     inline Vector3f getEmission();
-    inline void computeD(Vector3f ld);
 
 };
 
@@ -42,10 +39,5 @@ Vector3f Material::getEmission() {return m_emission;}
 
 Vector3f Material::getColorAt(double u, double v) {
     return Vector3f();
-}
-void Material::computeD(Vector3f ld) {
-    m_ld = ld;
-    auto A = m_color;
-	D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 }
 #endif //RAYTRACING_MATERIAL_H

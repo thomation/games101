@@ -454,7 +454,7 @@ bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vecto
 		return false;
 	target = inter.coords;
 	auto sN2tN = dotProduct(N, inter.normal);
-	if (sN2tN <= 0)
+	if (sN2tN < EPSILON)
 		return false;
 	pdf = Rd(r, d) * sN2tN;
 }
@@ -494,7 +494,10 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	Vector2f iuv;
 	Vector3f sample;
 	float pdf; 
-	if(!samplePoint(po, mo->D, No, sample , pdf))
+	auto A = hitObject->evalDiffuseColor(st);
+	auto ld = Vector3f(1.6, 1.6, 1.6);
+	auto D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
+	if(!samplePoint(po, D, No, sample , pdf))
 		return sumLightColor;
 	for (uint32_t i = 0; i < get_lights().size(); ++i)
 	{
@@ -516,8 +519,8 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
 		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
 		auto light =  get_lights()[i]->intensity * LdotN;
-		auto s = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, mi->D) / pdf;
-		auto diffColor = mi->Kd * light * inObject->evalDiffuseColor(ist) * s;
+		auto s = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D) / pdf;
+		auto diffColor = mo->Kd * light * inObject->evalDiffuseColor(ist) * s;
 		sumLightColor += diffColor;
 	}
 	

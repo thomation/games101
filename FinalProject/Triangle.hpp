@@ -110,6 +110,7 @@ public:
                 new Material(MaterialType::SUBSURFACE_SCATTERING,
                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
             new_mat->Kd = 0.6;
+            new_mat->Kss = 0.2;
             new_mat->Ks = 0.2;
             new_mat->specularExponent = 5;
             new_mat->ior = 1.33;
@@ -244,5 +245,5 @@ inline Intersection Triangle::getIntersection(Ray ray)
 
 inline Vector3f Triangle::evalDiffuseColor(const Vector2f&) const
 {
-    return Vector3f(0.5, 0.5, 0.5);
+    return Vector3f(50 / 255.0, 150 / 255.0, 200 / 255.0);
 }

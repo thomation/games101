@@ -439,7 +439,7 @@ bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vecto
 	auto d = D[channel];
 	auto r = sampleR(get_random_float(), d);
 	auto R = sampleR(0.996f, d);
-	if (r > R)
+	if (r > R || r < EPSILON)
 		return false;
 	float theta = 2.0 * M_PI * get_random_float();
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
@@ -520,7 +520,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
 		auto light =  get_lights()[i]->intensity * LdotN;
 		auto s = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D) / pdf;
-		auto diffColor = mo->Kss * light * s * inObject->evalDiffuseColor(ist);
+		auto diffColor = mo->Kss * light * s;
 		sumLightColor += diffColor;
 	}
 	

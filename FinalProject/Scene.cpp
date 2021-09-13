@@ -456,20 +456,21 @@ bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vecto
     Intersection inter = Scene::intersect(ray);
 	target = inter.coords;
 	auto dot = dotProduct(N, inter.normal);
-	if (dot < 0)
-		dot = EPSILON;
-	pdf = pdfR(r, d);
+	//std::cout << dot << std::endl;
+	if (dot <= 0)
+		return false;
+	pdf = pdfR(r, d) * dot;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
 {
-    float kro;
-	fresnel(wo, No, ioro, kro);
+    //float kro;
+	//fresnel(wo, No, ioro, kro);
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	//float d = std::abs(po.x - pi.x) + std::abs(po.y - pi.y) + std::abs(po.z - pi.z);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) * (1 - kro) * (1 - kri) / M_PI;
+	return Rd(d, D) * (1 - kri) / M_PI;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& pi, const Vector3f& D)
 {
@@ -525,7 +526,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
 		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
 		auto light =  get_lights()[i]->intensity * LdotN;
-		auto s = S(po, -ray.direction, No, 1.0 / mo->ior, pi, inLightDir, Ni, mi->ior, mi->D) / pdf;
+		auto s = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, mi->D) / pdf;
 		auto diffColor = mi->Kd * light * inObject->evalDiffuseColor(ist) * s;
 		sumLightColor += diffColor;
 	}

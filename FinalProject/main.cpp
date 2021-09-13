@@ -19,7 +19,6 @@ int main(int argc, char** argv)
     scene.Add(std::make_unique<Light>(Vector3f(-20, 70, 20), 1));
     scene.Add(std::make_unique<Light>(Vector3f(20, 70, 20), 1));
     scene.buildBVH();
-    scene.computeCDF();
 
     Renderer r;
 

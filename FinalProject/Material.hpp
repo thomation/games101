@@ -27,7 +27,6 @@ public:
     inline Vector3f getColorAt(double u, double v);
     inline Vector3f getEmission();
     inline void computeD(Vector3f ld);
-    inline float getLdAt(int index) const;
 
 };
 
@@ -46,10 +45,7 @@ Vector3f Material::getColorAt(double u, double v) {
 }
 void Material::computeD(Vector3f ld) {
     m_ld = ld;
-	D = ld / (3.5 + 100 * (Kd - 0.33) * (Kd - 0.33) * (Kd - 0.33) * (Kd - 0.33));
-}
-float Material::getLdAt(int index) const
-{
-    return m_ld[index];
+    auto A = m_color;
+	D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 }
 #endif //RAYTRACING_MATERIAL_H

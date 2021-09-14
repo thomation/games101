@@ -296,7 +296,6 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
             }
            case SUBSURFACE_SCATTERING: 
            {
-			   //hitColor = computeDiffuseAndGlossy(ray, depth, hitPoint, N, m, st, hitObject);
                hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
@@ -432,103 +431,127 @@ static float sampleR(float r, float d)
 	const float distance = LUT[ib] * (1 - offset + ib) + LUT[iu] * (offset - ib);
 	return distance * d;
 }
-bool Scene::samplePoint(const Vector3f & source, const Vector3f & D, const Vector3f& N, Vector3f & target, float & pdf) const
+static bool prepareSample(const Vector3f & D, float & r, float & R, float & pdf)
 {
 	//get one d with random channel
 	int channel = (int)std::min(3.0f * get_random_float(), 2.0f);
 	auto d = D[channel];
-	auto r = sampleR(get_random_float(), d);
-	auto R = sampleR(0.996f, d);
+	r = sampleR(get_random_float(), d);
+	R = sampleR(0.996f, d);
 	if (r > R || r < EPSILON)
 		return false;
+	pdf = Rd(r, d);
+	return true;
+}
+bool static samplePoint(const Scene * scene, const Vector3f & source, const Vector3f& N, float r, Vector3f & target, float & VNhit)
+{
 	float theta = 2.0 * M_PI * get_random_float();
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
-	Vector3f pos = source + dir * r;
+	Vector3f pos = source + dir * r * get_random_float();
 	//Vector3f T = normalize(pos - source);
 	//auto d = dotProduct(T, N);
 	//std::cout << d << std::endl;
 	Ray ray = Ray(pos, -N);
-    Intersection inter = Scene::intersect(ray);
+    Intersection inter = scene->intersect(ray);
 	if (!inter.happened)
 		return false;
 	target = inter.coords;
-	auto sN2tN = dotProduct(N, inter.normal);
-	if (sN2tN < EPSILON)
-		return false;
-	pdf = Rd(r, d) * sN2tN;
+	VNhit = std::abs(dotProduct(inter.normal, N));
+	return VNhit > 0.1;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
 {
 	float kri;
 	fresnel(wi, Ni, iori, kri);
-	//float d = std::abs(po.x - pi.x) + std::abs(po.y - pi.y) + std::abs(po.z - pi.z);
 	float d = sqrt(dotProduct(po - pi, po - pi));
 	return Rd(d, D) * (1 - kri) / M_PI;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
-	Vector3f sumLightColor = Vector3f(0);
-	Vector3f shadowPointOrig = (dotProduct(ray.direction, No) < 0) ?
-							   po + No * EPSILON :
-							   po - No * EPSILON;
-	for (uint32_t i = 0; i < get_lights().size(); ++i)
+	Vector3f resultColor = Vector3f(0);
+	const Vector3f A = hitObject->evalDiffuseColor(st);
+	const Vector3f ld = Vector3f(1.6, 1.6, 1.6);
+	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
+	float r, R, pdf;
+	if (prepareSample(D, r, R, pdf))
 	{
-		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-		if (area_ptr)
+		// bssrdf
+		Vector2f ist; // st coordinates
+		uint32_t index = 0;
+		Vector2f iuv;
+		Vector3f sample;
+		float VNhit;
+		const int spp = 1;
+		int validSampleCount = 0;
+		for (int i = 0; i < spp; i++)
 		{
-			// Do nothing for this assignment
+			bool valid = false;
+			if (samplePoint(this, po, No, r, sample, VNhit))
+			{
+				for (uint32_t i = 0; i < get_lights().size(); ++i)
+				{
+					auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+					if (area_ptr)
+						continue;
+					
+					Vector3f inLightDir = sample - get_lights()[i]->position ;
+					inLightDir = normalize(inLightDir);
+					auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
+					if (!inter.happened)
+						continue;
+					Material* mi = inter.m;
+					Object* inObject = inter.obj;
+					const Vector3f& pi = inter.coords;
+					Vector3f Ni = inter.normal; // normal
+					inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
+					float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
+					resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
+						* get_lights()[i]->intensity * LdotN
+						/ pdf / VNhit
+						* hitObject->evalDiffuseColor(st) * (mo->Kd);
+					valid = true;
+				}
+			}
+			if (valid)
+				validSampleCount++;
 		}
-		else
+		if (validSampleCount > 0)
 		{
-			Vector3f lightDir = get_lights()[i]->position - po;
-			// square of the distance between hitPoint and the light
-			float lightDistance2 = dotProduct(lightDir, lightDir);
-			lightDir = normalize(lightDir);
-			float LdotN = std::max(0.f, dotProduct(lightDir, No));
-			Object* shadowHitObject = nullptr;
-			float tNearShadow = kInfinity;
-			// is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
-			bool inShadow = bvh->Intersect(Ray(shadowPointOrig, lightDir)).happened;
-			auto lightAmt = (1 - inShadow) * get_lights()[i]->intensity * LdotN;
-			sumLightColor += lightAmt * hitObject->evalDiffuseColor(st) * (mo->Kd - 0.3);
+			resultColor = resultColor * (1.0 / validSampleCount);
+			return resultColor;
 		}
-	}
-	Vector2f ist; // st coordinates
-	uint32_t index = 0;
-	Vector2f iuv;
-	Vector3f sample;
-	float pdf; 
-	auto A = hitObject->evalDiffuseColor(st);
-	auto ld = Vector3f(1.6, 1.6, 1.6);
-	auto D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
-	if(!samplePoint(po, D, No, sample , pdf))
-		return sumLightColor;
-	for (uint32_t i = 0; i < get_lights().size(); ++i)
-	{
-		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-		if (area_ptr)
-			continue;
-		
-		Vector3f inLightDir = sample - get_lights()[i]->position ;
-		inLightDir = normalize(inLightDir);
-		auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
-		if (!inter.happened)
-			continue;
-		Material* mi = inter.m;
-		Object* inObject = inter.obj;
-		const Vector3f& pi = inter.coords;
-		Vector3f Ni = inter.normal; // normal
-
-
-		inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
-		float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
-		auto light =  get_lights()[i]->intensity * LdotN;
-		auto s = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D) / pdf;
-		auto diffColor =  light * s;
-		sumLightColor += diffColor;
+	
 	}
 	
-	return sumLightColor;
+	{
+		// brdf
+		Vector3f shadowPointOrig = (dotProduct(ray.direction, No) < 0) ?
+								   po + No * EPSILON :
+								   po - No * EPSILON;
+		for (uint32_t i = 0; i < get_lights().size(); ++i)
+		{
+			auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+			if (area_ptr)
+			{
+				// Do nothing for this assignment
+			}
+			else
+			{
+				Vector3f lightDir = get_lights()[i]->position - po;
+				// square of the distance between hitPoint and the light
+				float lightDistance2 = dotProduct(lightDir, lightDir);
+				lightDir = normalize(lightDir);
+				float LdotN = std::max(0.f, dotProduct(lightDir, No));
+				Object* shadowHitObject = nullptr;
+				float tNearShadow = kInfinity;
+				// is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
+				bool inShadow = bvh->Intersect(Ray(shadowPointOrig, lightDir)).happened;
+				auto lightAmt = (1 - inShadow) * get_lights()[i]->intensity * LdotN;
+				resultColor += lightAmt * hitObject->evalDiffuseColor(st) * (mo->Kd);
+			}
+		}
+	}
+	return resultColor;
 }

@@ -458,7 +458,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 		return false;
 	target = inter.coords;
 	VNhit = std::abs(dotProduct(inter.normal, N));
-	return VNhit > 0.0;
+	return VNhit > 0.1;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
@@ -472,7 +472,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 {
 	Vector3f resultColor = Vector3f(0);
 	const Vector3f A = hitObject->evalDiffuseColor(st);
-	const Vector3f ld = Vector3f(1.6, 1.6, 1.6);
+	const Vector3f ld = Vector3f(0.15, 0.15, 0.15);
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 	float r, R, pdf;
 	if (sampleR(D, r, R, pdf))
@@ -483,7 +483,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		Vector2f iuv;
 		Vector3f sample;
 		float VNhit;
-		const int spp = 2;
+		const int spp = 4;
 		int validSampleCount = 0;
 		for (int i = 0; i < spp; i++)
 		{
@@ -500,8 +500,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 					inLightDir = normalize(inLightDir);
 					auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
 					if (!inter.happened)
-						//continue;
-						return Vector3f(0, 0, 1);
+						continue;
 					Material* mi = inter.m;
 					Object* inObject = inter.obj;
 					const Vector3f& pi = inter.coords;
@@ -515,8 +514,8 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 					valid = true;
 				}
 			}
-			else
-				return Vector3f(0, 1, 0);
+		/*	else
+				return Vector3f(0, 1, 0);*/
 			if (valid)
 				validSampleCount++;
 		}
@@ -527,7 +526,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		}
 	
 	}
-	return Vector3f(1, 0, 0);
+	//return Vector3f(1, 0, 0);
 	{
 		// brdf
 		Vector3f shadowPointOrig = (dotProduct(ray.direction, No) < 0) ?

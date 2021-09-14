@@ -423,7 +423,7 @@ static Vector3f Rd(float r, const Vector3f& D)
 {
 	return Vector3f(Rd(r, D.x), Rd(r, D.y), Rd(r, D.z));
 }
-static float sampleR(float r, float d)
+static float computeR(float r, float d)
 {
 	float offset = std::min(r * LUTSize, LUTSize - 1.0f);
 	const int ib = (int)offset;
@@ -431,13 +431,13 @@ static float sampleR(float r, float d)
 	const float distance = LUT[ib] * (1 - offset + ib) + LUT[iu] * (offset - ib);
 	return distance * d;
 }
-static bool prepareSample(const Vector3f & D, float & r, float & R, float & pdf)
+static bool sampleR(const Vector3f & D, float & r, float & R, float & pdf)
 {
 	//get one d with random channel
 	int channel = (int)std::min(3.0f * get_random_float(), 2.0f);
 	auto d = D[channel];
-	r = sampleR(get_random_float(), d);
-	R = sampleR(0.996f, d);
+	r = computeR(get_random_float(), d);
+	R = computeR(0.996f, d);
 	if (r > R || r < EPSILON)
 		return false;
 	pdf = Rd(r, d);
@@ -448,7 +448,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 	float theta = 2.0 * M_PI * get_random_float();
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
-	Vector3f pos = source + dir * r * get_random_float();
+	Vector3f pos = source + dir * r;
 	//Vector3f T = normalize(pos - source);
 	//auto d = dotProduct(T, N);
 	//std::cout << d << std::endl;
@@ -458,7 +458,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 		return false;
 	target = inter.coords;
 	VNhit = std::abs(dotProduct(inter.normal, N));
-	return VNhit > 0.1;
+	return VNhit > 0.0;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
@@ -466,7 +466,7 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) * (1 - kri) / M_PI;
+	return Rd(d, D) * (1 - kri);// replace M_PI with Kss for diffuse;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
@@ -475,7 +475,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	const Vector3f ld = Vector3f(1.6, 1.6, 1.6);
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 	float r, R, pdf;
-	if (prepareSample(D, r, R, pdf))
+	if (sampleR(D, r, R, pdf))
 	{
 		// bssrdf
 		Vector2f ist; // st coordinates
@@ -483,7 +483,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		Vector2f iuv;
 		Vector3f sample;
 		float VNhit;
-		const int spp = 1;
+		const int spp = 2;
 		int validSampleCount = 0;
 		for (int i = 0; i < spp; i++)
 		{
@@ -495,12 +495,13 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 					auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
 					if (area_ptr)
 						continue;
-					
-					Vector3f inLightDir = sample - get_lights()[i]->position ;
+
+					Vector3f inLightDir = sample - get_lights()[i]->position;
 					inLightDir = normalize(inLightDir);
 					auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
 					if (!inter.happened)
-						continue;
+						//continue;
+						return Vector3f(0, 0, 1);
 					Material* mi = inter.m;
 					Object* inObject = inter.obj;
 					const Vector3f& pi = inter.coords;
@@ -510,10 +511,12 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 					resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
 						* get_lights()[i]->intensity * LdotN
 						/ pdf / VNhit
-						* hitObject->evalDiffuseColor(st) * (mo->Kd);
+						* hitObject->evalDiffuseColor(st) * (mo->Kss);
 					valid = true;
 				}
 			}
+			else
+				return Vector3f(0, 1, 0);
 			if (valid)
 				validSampleCount++;
 		}
@@ -524,7 +527,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 		}
 	
 	}
-	
+	return Vector3f(1, 0, 0);
 	{
 		// brdf
 		Vector3f shadowPointOrig = (dotProduct(ray.direction, No) < 0) ?

@@ -291,12 +291,13 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
             }
            case DIFFUSE_AND_GLOSSY :
             {
-			   hitColor = computeDiffuseAndGlossy(ray, depth, hitPoint, N, m, st, hitObject);
+			    hitColor = computeDiffuseAndGlossy(ray, depth, hitPoint, N, m, st, hitObject);
                 break;
             }
            case SUBSURFACE_SCATTERING: 
            {
                hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
+			   hitColor += computeGlossy(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
     }
@@ -400,6 +401,29 @@ Vector3f Scene::computeDiffuseAndGlossy(const Ray &ray, int depth, const Vector3
 	}
 	return lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
 }
+Vector3f Scene::computeGlossy(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const
+{
+	Vector3f  specularColor = 0;
+	for (uint32_t i = 0; i < get_lights().size(); ++i)
+	{
+		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+		if (area_ptr)
+		{
+			// Do nothing for this assignment
+		}
+		else
+		{
+			Vector3f lightDir = get_lights()[i]->position - hitPoint;
+			lightDir = normalize(lightDir);
+			float LdotN = std::max(0.f, dotProduct(lightDir, N));
+			Vector3f reflectionDirection = reflect(-lightDir, N);
+			specularColor += powf(std::max(0.f, -dotProduct(reflectionDirection, ray.direction)),
+								  m->specularExponent) * get_lights()[i]->intensity;
+		}
+	}
+	return specularColor * m->Ks;
+}
+
 static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
 	Vector3f B, C;
 	if (std::fabs(N.x) > std::fabs(N.y)) {
@@ -472,7 +496,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 {
 	Vector3f resultColor = Vector3f(0);
 	const Vector3f A = hitObject->evalDiffuseColor(st);
-	const Vector3f ld = Vector3f(0.15, 0.15, 0.15);
+	const Vector3f ld = Vector3f(0.2633, 0.23, 0.1919);
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 	float r, R, pdf;
 	if (sampleR(D, r, R, pdf))

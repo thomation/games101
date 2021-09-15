@@ -455,20 +455,15 @@ static float computeR(float r, float d)
 	const float distance = LUT[ib] * (1 - offset + ib) + LUT[iu] * (offset - ib);
 	return distance * d;
 }
-static bool sampleR(const Vector3f & D, float & r, float & R, float & pdf)
+bool static samplePoint(const Scene * scene, const Vector3f & source, const Vector3f& N, const Vector3f & D, Vector3f & target, float & pdf)
 {
 	//get one d with random channel
 	int channel = (int)std::min(3.0f * get_random_float(), 2.0f);
 	auto d = D[channel];
-	r = computeR(get_random_float(), d);
-	R = computeR(0.996f, d);
-	if (r > R || r < EPSILON)
+	auto r = computeR(get_random_float(), d);
+	auto Rm = computeR(0.996f, d);
+	if (r > Rm || r < EPSILON)
 		return false;
-	pdf = Rd(r, d);
-	return true;
-}
-bool static samplePoint(const Scene * scene, const Vector3f & source, const Vector3f& N, float r, Vector3f & target, float & VNhit)
-{
 	float theta = 2.0 * M_PI * get_random_float();
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
@@ -481,7 +476,11 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 	if (!inter.happened)
 		return false;
 	target = inter.coords;
-	VNhit = std::abs(dotProduct(inter.normal, N));
+	auto dis2 = dotProduct(source - target, source - target);
+	if (dis2 > 4 * Rm * Rm)
+		return false;
+	auto VNhit = std::abs(dotProduct(inter.normal, N));
+	pdf = Rd(r, d) * VNhit;
 	return VNhit > 0.1;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
@@ -499,57 +498,43 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	const Vector3f ld = Vector3f(0.2633, 0.23, 0.1919);
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 	float r, R, pdf;
-	if (sampleR(D, r, R, pdf))
-	{
 		// bssrdf
-		Vector2f ist; // st coordinates
-		uint32_t index = 0;
-		Vector2f iuv;
-		Vector3f sample;
-		float VNhit;
-		const int spp = 4;
-		int validSampleCount = 0;
-		for (int i = 0; i < spp; i++)
+	Vector2f ist; // st coordinates
+	uint32_t index = 0;
+	Vector2f iuv;
+	Vector3f sample;
+	if (samplePoint(this, po, No, D, sample, pdf))
+	{
+		for (uint32_t i = 0; i < get_lights().size(); ++i)
 		{
-			bool valid = false;
-			if (samplePoint(this, po, No, r, sample, VNhit))
-			{
-				for (uint32_t i = 0; i < get_lights().size(); ++i)
-				{
-					auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-					if (area_ptr)
-						continue;
+			auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+			if (area_ptr)
+				continue;
 
-					Vector3f inLightDir = sample - get_lights()[i]->position;
-					inLightDir = normalize(inLightDir);
-					auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
-					if (!inter.happened)
-						continue;
-					Material* mi = inter.m;
-					Object* inObject = inter.obj;
-					const Vector3f& pi = inter.coords;
-					Vector3f Ni = inter.normal; // normal
-					inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
-					float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
-					resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
-						* get_lights()[i]->intensity * LdotN
-						/ pdf / VNhit
-						* hitObject->evalDiffuseColor(st) * (mo->Kss);
-					valid = true;
-				}
-			}
+			Vector3f inLightDir = sample - get_lights()[i]->position;
+			inLightDir = normalize(inLightDir);
+			auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
+			if (!inter.happened)
+				continue;
+			auto dis2 = dotProduct(inter.coords - sample, inter.coords - sample);
+			if (dis2 > 0.01)
+				continue;
+			Material* mi = inter.m;
+			Object* inObject = inter.obj;
+			const Vector3f& pi = inter.coords;
+				Vector3f Ni = inter.normal; // normal
+				inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
+				float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
+				resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
+					* get_lights()[i]->intensity * LdotN
+					/ pdf
+					* hitObject->evalDiffuseColor(st) * (mo->Kss);
+		}
 		/*	else
 				return Vector3f(0, 1, 0);*/
-			if (valid)
-				validSampleCount++;
-		}
-		if (validSampleCount > 0)
-		{
-			resultColor = resultColor * (1.0 / validSampleCount);
-			return resultColor;
-		}
-	
+		return resultColor;
 	}
+	
 	//return Vector3f(1, 0, 0);
 	{
 		// brdf

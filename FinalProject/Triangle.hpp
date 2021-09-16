@@ -111,7 +111,7 @@ public:
                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
             new_mat->Kd = 0.6;
             new_mat->Ks = 0.1;
-            new_mat->Kss = 0.7;
+            new_mat->Kss = 0.6;
             new_mat->specularExponent = 5;
             new_mat->ior = 1.5;
 
@@ -245,7 +245,7 @@ inline Intersection Triangle::getIntersection(Ray ray)
 
 inline Vector3f Triangle::evalDiffuseColor(const Vector2f&) const
 {
-    return Vector3f(1, 1, 0.9); // Jade
+    return Vector3f(1, 1, 1); // Jade
     //return Vector3f(0.83, 0.79, 0.75); // Marble
     //return Vector3f(0.44, 0.22, 0.13); // Skin1
     //return Vector3f(0.63, 0.44, 0.34); // Skin2

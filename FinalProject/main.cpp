@@ -15,11 +15,13 @@ int main(int argc, char** argv)
 
     std::cout << "Loading model";
     //MeshTriangle bunny("../models/bunny/bunny.obj");
-    //MeshTriangle bunny("../models/bunny/bunny_high.obj");
-    MeshTriangle bunny("../models/dragon.obj");
+    MeshTriangle bunny("../models/bunny/bunny_high.obj");
+    //MeshTriangle bunny("../models/dragon.obj");
     scene.Add(&bunny);
-    scene.Add(std::make_unique<Light>(Vector3f(-20, 00, 50), 0.8));
-    scene.Add(std::make_unique<Light>(Vector3f(20, 90, 50), 0.8));
+    //scene.Add(std::make_unique<Light>(Vector3f(-20, 00, 50), Vector3f(1.0, 0.89, 0.52)));
+    //scene.Add(std::make_unique<Light>(Vector3f(20, 90, 50), Vector3f(1.0, 0.89, 0.52)));
+    scene.Add(std::make_unique<Light>(Vector3f(-20, 00, 50), Vector3f(0.5, 0.8, 0.5)));
+    scene.Add(std::make_unique<Light>(Vector3f(20, 90, 50), Vector3f(0.5, 0.8, 0.5)));
     std::cout << "Building BVH" << std::endl;
     scene.buildBVH();
 

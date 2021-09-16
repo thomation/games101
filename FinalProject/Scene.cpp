@@ -297,7 +297,7 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
            case SUBSURFACE_SCATTERING: 
            {
                hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
-			   //hitColor += computeGlossy(ray, depth, hitPoint, N, m, st, hitObject);
+			   hitColor += computeGlossy(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
     }
@@ -458,13 +458,15 @@ static float computeR(float r, float d)
 bool static samplePoint(const Scene * scene, const Vector3f & source, const Vector3f& N, const Vector3f & D, Vector3f & target, float & pdf)
 {
 	//get one d with random channel
-	int channel = (int)std::min(3.0f * get_random_float(), 2.0f);
+	float ran1 = get_random_float();
+	float ran2 = get_random_float();
+	int channel = (int)std::min(3.0f * ran1 , 2.0f);
 	auto d = D[channel];
-	auto r = computeR(get_random_float(), d);
+	auto r = computeR(ran1, d);
 	auto Rm = computeR(0.996f, d);
 	if (r > Rm || r < EPSILON)
 		return false;
-	float theta = 2.0 * M_PI * get_random_float();
+	float theta = 2.0 * M_PI * ran2;
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
 	Vector3f pos = source + dir * r;
@@ -480,7 +482,9 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 	if (dis2 > 4 * Rm * Rm)
 		return false;
 	auto VNhit = std::abs(dotProduct(inter.normal, N));
-	pdf = Rd(r, d) * VNhit;
+	pdf = 0;
+	for(int i = 0; i < 3; i ++)
+		pdf += Rd(r, D[i])* VNhit / 3.0f;
 	return VNhit > 0.1;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
@@ -489,14 +493,15 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) * (1 - kri);// replace M_PI with Kss for diffuse;
+	return Rd(d, D) /** (1 - kri)*/ / M_PI;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
 	Vector3f resultColor = Vector3f(0);
 	const Vector3f A = hitObject->evalDiffuseColor(st);
+	const Vector3f ld = Vector3f(11.547, 11.547, 11.547);// Jade
 	//const Vector3f ld = Vector3f(8.509, 5.566, 3.951); // Marble
-	const Vector3f ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
+	//const Vector3f ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 	float r, R, pdf;
 		// bssrdf
@@ -529,7 +534,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 				resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
 					* get_lights()[i]->intensity * LdotN
 					/ pdf
-					* hitObject->evalDiffuseColor(st) * (mo->Kss);
+					* hitObject->evalDiffuseColor(st);
 		}
 		/*	else
 				return Vector3f(0, 1, 0);*/

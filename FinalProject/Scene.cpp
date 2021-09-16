@@ -469,7 +469,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 	float theta = 2.0 * M_PI * ran2;
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
-	Vector3f pos = source + dir * r;
+	Vector3f pos = source + dir * r + N * sqrt(Rm * Rm - r * r);
 	//Vector3f T = normalize(pos - source);
 	//auto d = dotProduct(T, N);
 	//std::cout << d << std::endl;
@@ -479,7 +479,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 		return false;
 	target = inter.coords;
 	auto dis2 = dotProduct(source - target, source - target);
-	if (dis2 > 4 * Rm * Rm)
+	if (dis2 > Rm * Rm)
 		return false;
 	auto VNhit = std::abs(dotProduct(inter.normal, N));
 	pdf = 0;
@@ -493,7 +493,7 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) /** (1 - kri)*/ / M_PI;
+	return Rd(d, D);// *(1 - kri) /* M_PI */;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {
@@ -534,7 +534,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 				resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
 					* get_lights()[i]->intensity * LdotN
 					/ pdf
-					* hitObject->evalDiffuseColor(st);
+					* hitObject->evalDiffuseColor(st) * mo->Kss;
 		}
 		/*	else
 				return Vector3f(0, 1, 0);*/

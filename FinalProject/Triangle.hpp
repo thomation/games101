@@ -111,6 +111,7 @@ public:
                              Vector3f(0.5, 0.5, 0.5), Vector3f(0, 0, 0));
             new_mat->Kd = 0.6;
             new_mat->Ks = 0.1;
+            new_mat->Kss = 0.7;
             new_mat->specularExponent = 5;
             new_mat->ior = 1.5;
 

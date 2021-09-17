@@ -482,9 +482,7 @@ bool static samplePoint(const Scene * scene, const Vector3f & source, const Vect
 	if (dis2 > Rm * Rm)
 		return false;
 	auto VNhit = std::abs(dotProduct(inter.normal, N));
-	pdf = 0;
-	for(int i = 0; i < 3; i ++)
-		pdf += Rd(r, D[i])* VNhit / 3.0f;
+	pdf = Rd(r, d) * VNhit / 3.0f;
 	return VNhit > 0.1;
 }
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
@@ -493,7 +491,7 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D);// *(1 - kri) /* M_PI */;
+	return Rd(d, D) /*(1 - kri)*/ / M_PI;
 }
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
 {

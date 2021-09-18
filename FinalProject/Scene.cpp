@@ -483,7 +483,7 @@ bool static samplePointPreCompute(const Scene* scene, const Vector3f& source, co
 	pdf = Rd(r, d) * VNhit / 3.0f;
 	return VNhit > 0.1;
 }
-const float D2Rm = 5;
+const float D2Rm = 12;
 bool static samplePointMis(const Scene * scene, const Vector3f & source, const Vector3f& N, const Vector3f & D,
 	Vector3f & target, float & pdf)
 {
@@ -506,8 +506,8 @@ bool static samplePointMis(const Scene * scene, const Vector3f & source, const V
 		r = -3 * d * log(1.0f - get_random_float() * (1.0f - exp(-Rm / (3 * d))));
 		pdf = w2 / (w1 + w2);
 	}
-	pdf *= exp(-r / d) / (2 * M_PI * d * r) / (1 - exp(-Rm / d))
-		+ exp(-r / (3 * d)) / (2 * M_PI * d * r) / (3 * (1 - exp(-Rm / (3 * d))));
+	pdf *= (exp(-r / d) / (2 * M_PI * d * r) / (1 - exp(-Rm / d))
+			+ exp(-r / (3 * d)) / (2 * M_PI * d * r) / (3 * (1 - exp(-Rm / (3 * d)))));
 
 	if (r > Rm || r < EPSILON)
 		return false;
@@ -553,6 +553,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	Vector2f iuv;
 	Vector3f sample;
 	float pdf;
+
 	if (samplePointMis(this, po, No, D, sample, pdf))
 	//if (samplePointPreCompute(this, po, No, D, sample, pdf))
 	{

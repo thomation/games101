@@ -14,7 +14,7 @@ const float EPSILON = 0.00001;
 // The main render function. This where we iterate over all pixels in the image,
 // generate primary rays and cast these rays into the scene. The content of the
 // framebuffer is saved to a file.
-const int spp = 128;
+const int spp = 256;
 void Renderer::Render(const Scene& scene)
 {
     std::vector<Vector3f> framebuffer(scene.width * scene.height);
@@ -45,9 +45,10 @@ void Renderer::Render(const Scene& scene)
     (void)fprintf(fp, "P6\n%d %d\n255\n", scene.width, scene.height);
     for (auto i = 0; i < scene.height * scene.width; ++i) {
         static unsigned char color[3];
-        color[0] = (unsigned char)(255 * clamp(0, 1, framebuffer[i].x));
-        color[1] = (unsigned char)(255 * clamp(0, 1, framebuffer[i].y));
-        color[2] = (unsigned char)(255 * clamp(0, 1, framebuffer[i].z));
+        // sqrt gamma 2
+        color[0] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].x)));
+        color[1] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].y)));
+        color[2] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].z)));
         fwrite(color, 1, 3, fp);
     }
     fclose(fp);    

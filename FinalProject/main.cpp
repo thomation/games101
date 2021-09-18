@@ -14,14 +14,14 @@ int main(int argc, char** argv)
     Scene scene(960, 640);
 
     std::cout << "Loading model";
-    //MeshTriangle bunny("../models/bunny/bunny.obj");
-    MeshTriangle bunny("../models/bunny/bunny_high.obj");
-    //MeshTriangle bunny("../models/dragon.obj");
-    scene.Add(&bunny);
+    //MeshTriangle model("../models/bunny/bunny.obj");
+    MeshTriangle model("../models/bunny/bunny_high.obj");
+    //MeshTriangle model("../models/dragon/dragon.obj");
+    scene.Add(&model);
     //scene.Add(std::make_unique<Light>(Vector3f(-20, 90, 50), Vector3f(1.0, 0.89, 0.52)));
     //scene.Add(std::make_unique<Light>(Vector3f(20, 90, 50), Vector3f(1.0, 0.89, 0.52)));
     //scene.Add(std::make_unique<Light>(Vector3f(-20, 90, 50), Vector3f(0.5, 0.8, 0.5)));
-    //scene.Add(std::make_unique<Light>(Vector3f(20, 90, 50), Vector3f(0.5, 0.8, 0.5)));
+    scene.Add(std::make_unique<Light>(Vector3f(0, 90, 50), Vector3f(0.5, 0.5, 0.5)));
     scene.Add(std::make_unique<Light>(Vector3f(-20, 90, 50), Vector3f(1.0)));
     std::cout << "Building BVH" << std::endl;
     scene.buildBVH();

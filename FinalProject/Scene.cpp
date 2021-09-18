@@ -297,7 +297,6 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
            case SUBSURFACE_SCATTERING: 
            {
                hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
-			   hitColor += computeGlossy(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
     }
@@ -455,18 +454,17 @@ static float computeR(float r, float d)
 	const float distance = LUT[ib] * (1 - offset + ib) + LUT[iu] * (offset - ib);
 	return distance * d;
 }
-bool static samplePointPreCompute(const Scene* scene, const Vector3f& source, const Vector3f& N, const Vector3f& D, const int strategy, Vector3f& target, float& pdf)
+bool static samplePointPreCompute(const Scene* scene, const Vector3f& source, const Vector3f& N, const Vector3f& D,
+	Vector3f& target, float& pdf)
 {
 	//get one d with random channel
-	float ran1 = get_random_float();
-	float ran2 = get_random_float();
-	int channel = (int)std::min(3.0f * ran1, 2.0f);
+	int channel = (int)std::min(3.0f * get_random_float(), 2.0f);
 	auto d = D[channel];
-	auto r = computeR(ran1, d);
+	auto r = computeR(get_random_float(), d);
 	auto Rm = computeR(0.996f, d);
 	if (r > Rm || r < EPSILON)
 		return false;
-	float theta = 2.0 * M_PI * ran2;
+	float theta = 2.0 * M_PI * get_random_float();
 	Vector3f local_dir(std::cos(theta), std::sin(theta), 0.0);
 	auto dir = toWorld(normalize(local_dir), N);
 	Vector3f pos = source + dir * r + N * sqrt(Rm * Rm - r * r);
@@ -485,18 +483,32 @@ bool static samplePointPreCompute(const Scene* scene, const Vector3f& source, co
 	pdf = Rd(r, d) * VNhit / 3.0f;
 	return VNhit > 0.1;
 }
-bool static samplePointMis(const Scene * scene, const Vector3f & source, const Vector3f& N, const Vector3f & D, const int strategy, Vector3f & target, float & pdf)
+const float D2Rm = 5;
+bool static samplePointMis(const Scene * scene, const Vector3f & source, const Vector3f& N, const Vector3f & D,
+	Vector3f & target, float & pdf)
 {
 	//get one d with random channel
-	int channel = (int)std::min(3.0f * get_random_float() , 2.0f);
-	auto d = D[channel];
-	float r = -d * log(1 - get_random_float());
-	float Rm = -d * log(0.005);
-	if (strategy == 1)
+	const int channel = (int)std::min(3.0f * get_random_float() , 2.0f);
+	const float d = D[channel];
+	const float Rm = d * D2Rm;
+	float r;
+	//random weight to select a strategy for r 
+	const float w1 = 1.0f - exp(-Rm / d);
+	const float w2 = 1.0f - exp(-Rm / (3 * d));
+	const float w = (w1 + w2) * get_random_float();
+	if (w < w1)
 	{
-		r *= 3;
-		Rm *= 3;
+		r = -d * log(1.0f - get_random_float() * (1.0f - exp(-Rm / d)));
+		pdf = w1 / (w1 + w2);
 	}
+	else
+	{
+		r = -3 * d * log(1.0f - get_random_float() * (1.0f - exp(-Rm / (3 * d))));
+		pdf = w2 / (w1 + w2);
+	}
+	pdf *= exp(-r / d) / (2 * M_PI * d * r) / (1 - exp(-Rm / d))
+		+ exp(-r / (3 * d)) / (2 * M_PI * d * r) / (3 * (1 - exp(-Rm / (3 * d))));
+
 	if (r > Rm || r < EPSILON)
 		return false;
 	float theta = 2.0 * M_PI * get_random_float();
@@ -515,10 +527,6 @@ bool static samplePointMis(const Scene * scene, const Vector3f & source, const V
 	if (dis2 > Rm * Rm)
 		return false;
 	auto VNhit = std::abs(dotProduct(inter.normal, N));
-	if(strategy == 0)
-		pdf = exp(-r / d) / (2 * M_PI * d * r);
-	else 
-		pdf = exp(-r / 3/ d) / (6 * M_PI * d * r);
 	pdf *= VNhit / 3.0f;
 	return VNhit > 0.01;
 }
@@ -540,65 +548,41 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 	//const Vector3f ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
 	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 
-	float r, R;
-	float pdfs[StrategyNum];
 	Vector2f ist; // st coordinates
 	uint32_t index = 0;
 	Vector2f iuv;
 	Vector3f sample;
-	int validSampleCount = 0;
-	Vector3f bssrdfColors[StrategyNum];
-	for (int strategy = 0; strategy < StrategyNum; strategy++)
+	float pdf;
+	if (samplePointMis(this, po, No, D, sample, pdf))
+	//if (samplePointPreCompute(this, po, No, D, sample, pdf))
 	{
-		if (samplePointMis(this, po, No, D, strategy, sample, pdfs[strategy]))
-		//if (samplePointPreCompute(this, po, No, D, strategy, sample, pdfs[strategy]))
+		for (uint32_t i = 0; i < get_lights().size(); ++i)
 		{
-			bool valid = false;
-			for (uint32_t i = 0; i < get_lights().size(); ++i)
-			{
-				auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-				if (area_ptr)
-					continue;
+			auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
+			if (area_ptr)
+				continue;
 
-				Vector3f inLightDir = sample - get_lights()[i]->position;
-				inLightDir = normalize(inLightDir);
-				auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
-				if (!inter.happened)
-					continue;
-				auto dis2 = dotProduct(inter.coords - sample, inter.coords - sample);
-				if (dis2 > 0.01)
-					continue;
-				Material* mi = inter.m;
-				Object* inObject = inter.obj;
-				const Vector3f& pi = inter.coords;
-				Vector3f Ni = inter.normal; // normal
-				inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
-				float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
-				bssrdfColors[strategy] = S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
-					* get_lights()[i]->intensity * LdotN
-					/ pdfs[strategy]
-					* A * mo->Kss;
-				valid = true;
-			}
-			if(valid)
-				validSampleCount++;
+			Vector3f inLightDir = sample - get_lights()[i]->position;
+			inLightDir = normalize(inLightDir);
+			auto inter = Scene::intersect(Ray(get_lights()[i]->position, inLightDir));
+			if (!inter.happened)
+				continue;
+			auto dis2 = dotProduct(inter.coords - sample, inter.coords - sample);
+			if (dis2 > 0.01)
+				continue;
+			Material* mi = inter.m;
+			Object* inObject = inter.obj;
+			const Vector3f& pi = inter.coords;
+			Vector3f Ni = inter.normal; // normal
+			inObject->getSurfaceProperties(pi, inLightDir, index, iuv, Ni, ist);
+			float LdotN = std::max(0.f, dotProduct(-inLightDir, Ni));
+			resultColor += S(po, ray.direction, No, mo->ior, pi, inLightDir, Ni, mi->ior, D)
+				* get_lights()[i]->intensity * LdotN
+				/ pdf
+				* A * mo->Kss;
 		}
-	}
-	//if (validSampleCount == 0)
-	//	return Vector3f(1, 0, 0);
-	//if (validSampleCount == 1)
-	//	return Vector3f(0, 1, 0);
-	//if (validSampleCount == 2)
-	//	return Vector3f(0, 0, 1);
-
-	// MIS
-	float sumPdf = 0;
-	for (int i = 0; i < validSampleCount; i++)
-		sumPdf += pdfs[i];
-	for(int i = 0; i < validSampleCount; i ++)
-		resultColor += bssrdfColors[i] * pdfs[i] / sumPdf;
-	if (validSampleCount > 0)
 		return resultColor;
+	}
 
 	// If no valid sample, use diffuse
 	//return Vector3f(1, 0, 0);

@@ -43,12 +43,13 @@ void Renderer::Render(const Scene& scene)
     // save framebuffer to file
     FILE* fp = fopen("binary.ppm", "wb");
     (void)fprintf(fp, "P6\n%d %d\n255\n", scene.width, scene.height);
+    const float gamma = 1.0f / 2.2f;
     for (auto i = 0; i < scene.height * scene.width; ++i) {
         static unsigned char color[3];
         // sqrt gamma 2
-        color[0] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].x)));
-        color[1] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].y)));
-        color[2] = (unsigned char)(255 * clamp(0, 1, sqrt(framebuffer[i].z)));
+        color[0] = (unsigned char)(255 * clamp(0, 1, pow(framebuffer[i].x, gamma)));
+        color[1] = (unsigned char)(255 * clamp(0, 1, pow(framebuffer[i].y, gamma)));
+        color[2] = (unsigned char)(255 * clamp(0, 1, pow(framebuffer[i].z, gamma)));
         fwrite(color, 1, 3, fp);
     }
     fclose(fp);    

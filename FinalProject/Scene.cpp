@@ -536,7 +536,7 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	float kri;
 	fresnel(wi, Ni, iori, kri);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) /*(1 - kri)*/ / M_PI;
+	return Rd(d, D) * (1 - kri) / M_PI;
 }
 const int StrategyNum = 2;
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const

@@ -305,14 +305,14 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
 }
 
     // Compute Fresnel equation
-//
-// \param I is the incident view direction
-//
-// \param N is the normal at the intersection point
-//
-// \param ior is the material refractive index
-//
-// \param[out] kr is the amount of light reflected
+	//
+	// \param I is the incident view direction
+	//
+	// \param N is the normal at the intersection point
+	//
+	// \param ior is the material refractive index
+	//
+	// \param[out] kr is the amount of light reflected
     static void fresnel(const Vector3f &I, const Vector3f &N, const float &ior, float &kr)
     {
         float cosi = clamp(-1, 1, dotProduct(I, N));
@@ -333,7 +333,32 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
         }
         // As a consequence of the conservation of energy, transmittance is given by:
         // kt = 1 - kr;
-    }
+    } 
+	
+	// Compute refraction direction using Snell's law
+	//
+	// We need to handle with care the two possible situations:
+	//
+	//    - When the ray is inside the object
+	//
+	//    - When the ray is outside.
+	//
+	// If the ray is outside, you need to make cosi positive cosi = -N.I
+	//
+	// If the ray is inside, you need to invert the refractive indices and negate the normal N
+	static Vector3f refract(const Vector3f& I, const Vector3f& N, const float& ior)
+	{
+		float cosi = clamp(-1, 1, dotProduct(I, N));
+		float etai = 1, etat = ior;
+		Vector3f n = N;
+		if (cosi < 0) { cosi = -cosi; }
+		else { std::swap(etai, etat); n = -N; }
+		float eta = etai / etat;
+		float k = 1 - eta * eta * (1 - cosi * cosi);
+		return k < 0 ? 0 : eta * I + (eta * cosi - sqrtf(k)) * n;
+	}
+
+
 Vector3f Scene::computeReflectionAndFefraction(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m) const
 {
 	Vector3f reflectionDirection = normalize(reflect(ray.direction, N));
@@ -530,13 +555,18 @@ bool static samplePointMis(const Scene * scene, const Vector3f & source, const V
 	pdf *= VNhit / 3.0f;
 	return VNhit > 0.01;
 }
+// wi and wo ara all towards to surface
+// Ni and No are all from surface
 static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, float ioro,
 	const Vector3f& pi, const Vector3f& wi, const Vector3f& Ni, float iori, const Vector3f& D)
 {
 	float kri;
 	fresnel(wi, Ni, iori, kri);
+	float kro;
+	auto wor = refract(wo, No, ioro);
+	fresnel(-wor, No, ioro, kro);
 	float d = sqrt(dotProduct(po - pi, po - pi));
-	return Rd(d, D) * (1 - kri) / M_PI;
+	return (1 - kro) * Rd(d, D) * (1 - kri) / M_PI;
 }
 const int StrategyNum = 2;
 Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const

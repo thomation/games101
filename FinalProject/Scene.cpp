@@ -296,7 +296,10 @@ Vector3f Scene::castRay(const Ray &ray, int depth) const
             }
            case SUBSURFACE_SCATTERING: 
            {
-               hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject);
+			   bool suc = false;
+               hitColor = computeSubsurfaceScattering(ray, depth, hitPoint, N, m, st, hitObject, suc);
+			   if(!suc)
+				   hitColor = computeDiffuseAndGlossy(ray, depth, hitPoint, N, m, st, hitObject);
            }
         }
     }
@@ -425,28 +428,6 @@ Vector3f Scene::computeDiffuseAndGlossy(const Ray &ray, int depth, const Vector3
 	}
 	return lightAmt * (hitObject->evalDiffuseColor(st) * m->Kd + specularColor * m->Ks);
 }
-Vector3f Scene::computeGlossy(const Ray &ray, int depth, const Vector3f& hitPoint, const Vector3f& N, Material * m, const Vector2f& st, Object * hitObject) const
-{
-	Vector3f  specularColor = 0;
-	for (uint32_t i = 0; i < get_lights().size(); ++i)
-	{
-		auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-		if (area_ptr)
-		{
-			// Do nothing for this assignment
-		}
-		else
-		{
-			Vector3f lightDir = get_lights()[i]->position - hitPoint;
-			lightDir = normalize(lightDir);
-			float LdotN = std::max(0.f, dotProduct(lightDir, N));
-			Vector3f reflectionDirection = reflect(-lightDir, N);
-			specularColor += powf(std::max(0.f, -dotProduct(reflectionDirection, ray.direction)),
-								  m->specularExponent) * get_lights()[i]->intensity;
-		}
-	}
-	return specularColor * m->Ks;
-}
 
 static Vector3f toWorld(const Vector3f& a, const Vector3f& N) {
 	Vector3f B, C;
@@ -569,7 +550,8 @@ static Vector3f S(const Vector3f& po, const Vector3f& wo, const Vector3f& No, fl
 	return (1 - kro) * Rd(d, D) * (1 - kri) / M_PI;
 }
 const int StrategyNum = 2;
-Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject) const
+Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vector3f& po, const Vector3f& No, Material * mo, const Vector2f& st, Object * hitObject,
+											bool & suc) const
 {
 	Vector3f resultColor = Vector3f(0);
 	const Vector3f A = hitObject->evalDiffuseColor(st);
@@ -611,38 +593,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 				* get_lights()[i]->intensity * LdotN
 				/ pdf
 				* A * mo->Kss;
-		}
-		return resultColor;
-	}
-
-	// If no valid sample, use diffuse
-	//return Vector3f(1, 0, 0);
-	{
-		// brdf
-		Vector3f shadowPointOrig = (dotProduct(ray.direction, No) < 0) ?
-								   po + No * EPSILON :
-								   po - No * EPSILON;
-		for (uint32_t i = 0; i < get_lights().size(); ++i)
-		{
-			auto area_ptr = dynamic_cast<AreaLight*>(this->get_lights()[i].get());
-			if (area_ptr)
-			{
-				// Do nothing for this assignment
-			}
-			else
-			{
-				Vector3f lightDir = get_lights()[i]->position - po;
-				// square of the distance between hitPoint and the light
-				float lightDistance2 = dotProduct(lightDir, lightDir);
-				lightDir = normalize(lightDir);
-				float LdotN = std::max(0.f, dotProduct(lightDir, No));
-				Object* shadowHitObject = nullptr;
-				float tNearShadow = kInfinity;
-				// is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
-				bool inShadow = bvh->Intersect(Ray(shadowPointOrig, lightDir)).happened;
-				auto lightAmt = (1 - inShadow) * get_lights()[i]->intensity * LdotN;
-				resultColor += lightAmt * hitObject->evalDiffuseColor(st) * (mo->Kd);
-			}
+			suc = true;
 		}
 	}
 	return resultColor;

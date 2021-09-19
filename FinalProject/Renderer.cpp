@@ -14,7 +14,7 @@ const float EPSILON = 0.00001;
 // The main render function. This where we iterate over all pixels in the image,
 // generate primary rays and cast these rays into the scene. The content of the
 // framebuffer is saved to a file.
-const int spp = 256;
+const int spp = 1;
 void Renderer::Render(const Scene& scene)
 {
     std::vector<Vector3f> framebuffer(scene.width * scene.height);
@@ -23,7 +23,7 @@ void Renderer::Render(const Scene& scene)
     float imageAspectRatio = scene.width / (float)scene.height;
     //Vector3f eye_pos(-1, 5, 10); // bunny low
     Vector3f eye_pos(-1, -5, 60); // bunny high
-    int m = 0;
+    float progress = 0;
 #pragma omp parallel for
     for (int j = 0; j < scene.height; ++j) {
         for (int i = 0; i < scene.width; ++i) {
@@ -36,10 +36,10 @@ void Renderer::Render(const Scene& scene)
                 framebuffer[j * scene.width + i] += scene.castRay(Ray(eye_pos, dir), 0) / spp;
             }
         }
-        UpdateProgress(j / (float)scene.height);
+        progress++;
+        printf("progress:%f\n", progress / scene.height);
     }
-    UpdateProgress(1.f);
-
+    std::cout << "Done" << std::endl;
     // save framebuffer to file
     FILE* fp = fopen("binary.ppm", "wb");
     (void)fprintf(fp, "P6\n%d %d\n255\n", scene.width, scene.height);

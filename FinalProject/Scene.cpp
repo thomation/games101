@@ -554,10 +554,7 @@ Vector3f Scene::computeSubsurfaceScattering(const Ray &ray, int depth, const Vec
 {
 	Vector3f resultColor = Vector3f(0);
 	const Vector3f A = hitObject->evalDiffuseColor(st);
-	//const Vector3f ld = Vector3f(10.31, 10.31, 10.31);// Jade
-	const Vector3f ld = Vector3f(8.509, 5.566, 3.951); // Marble
-	//const Vector3f ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
-	const Vector3f D = ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
+	const Vector3f D = mo->Ld * (Vector3f(3.5) + 100 * (A - 0.33) * (A - 0.33) * (A - 0.33) * (A - 0.33)).Inverse();
 
 	Vector2f ist; // st coordinates
 	uint32_t index = 0;

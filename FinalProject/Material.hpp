@@ -16,6 +16,7 @@ public:
     Vector3f m_emission;
     float ior;
     float Kd, Ks, Kss;
+    Vector3f Ld;
     float specularExponent;
     //Texture tex;
 

@@ -1,4 +1,5 @@
 # GAMES101 大作业 BSSRDF
+## 代码结构
 * 使用作业6的框架，单模型，点光源，蒙特卡洛方法，omp并行
 * BSSRDF渲染在Scene::computeSubsurfaceScattering实现
 * * 首先Sample po周围的一个点pi
@@ -11,9 +12,13 @@
 * * 在po点所在切平面上，以po为圆心，r为半径的圆弧上采样一个点p, 将p投射到模型表面，获取po点
 * * 实现了两个重要性采样方式来计算po点的pdf
 * * * 通过预计算CDF，实现Inverse Sampling。代码在samplePointPreCompute
-* * * 拆分两项，实现MIS。代码在samplePointMis
-
-## 视频地址
+* * * Normalized Diffusion拆分成有解析解两项，实现MIS。代码在samplePointMis
+## 辅助工具
+* material.xlsx 计算材质的ld
+* cdf.py 预计算Normalized Diffusion的cdf的逆, 需要安装scipy库
+## 报告 
+* report.pptx
+* 视频地址：
 ## 参考文献
 * https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf
 * https://graphics.pixar.com/library/ApproxBSSRDF/paper.pdf

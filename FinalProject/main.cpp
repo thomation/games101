@@ -11,7 +11,7 @@
 // function().
 int main(int argc, char** argv)
 {
-    Scene scene(960, 640);
+    Scene scene(1024, 1024);
 
     std::cout << "Loading model";
     //MeshTriangle model("../models/bunny/bunny.obj");

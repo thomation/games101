@@ -113,10 +113,10 @@ public:
             new_mat->Ks = 0.1;
             new_mat->Kss = 0.9;
             new_mat->specularExponent = 5;
-            new_mat->ior = 1.3;
+            new_mat->ior = 1.5;
 			new_mat->Ld = Vector3f(8.509, 5.566, 3.951); // Marble
-			new_mat->Ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
-			new_mat->Ld = Vector3f(6.9611, 6.4002, 1.9248); // Apple
+			//new_mat->Ld = Vector3f(4.8215, 1.6937, 1.0900); // Skin2
+			//new_mat->Ld = Vector3f(6.9611, 6.4002, 1.9248); // Apple
 
             triangles.emplace_back(face_vertices[0], face_vertices[1],
                                    face_vertices[2], new_mat);
@@ -248,7 +248,7 @@ inline Intersection Triangle::getIntersection(Ray ray)
 
 inline Vector3f Triangle::evalDiffuseColor(const Vector2f&) const
 {
-    //return Vector3f(0.83, 0.79, 0.75); // Marble
-    return Vector3f(0.85, 0.84, 0.53); // Apple
+    return Vector3f(0.83, 0.79, 0.75); // Marble
+    //return Vector3f(0.85, 0.84, 0.53); // Apple
     //return Vector3f(0.63, 0.44, 0.34); // Skin2
 }

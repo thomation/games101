@@ -1,6 +1,6 @@
 # GAMES101 大作业 BSSRDF
 ## 代码结构
-* 使用作业6的框架，单模型，点光源，蒙特卡洛方法，omp并行
+* 使用作业6的框架，单模型，点光源，蒙特卡洛方法，omp并行,visual studio运行
 * BSSRDF渲染在Scene::computeSubsurfaceScattering实现
 * * 首先Sample po周围的一个点pi
 * * 如果sample成功，且该点能被光照到，计算次表面S
@@ -17,8 +17,11 @@
 * material.xlsx 计算材质的ld
 * cdf.py 预计算Normalized Diffusion的cdf的逆, 需要安装scipy库
 ## 报告 
-* report.pptx
-* 视频地址：
+* images
+* report.pdf
+* 视频
+* * 链接：https://pan.baidu.com/s/1DADUFXcSmb3dggntv2YcMw 
+* * 提取码：wu5h
 ## 参考文献
 * https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf
 * https://graphics.pixar.com/library/ApproxBSSRDF/paper.pdf
